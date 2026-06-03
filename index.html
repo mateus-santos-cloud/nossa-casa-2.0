@@ -818,18 +818,16 @@ function renderDashboard() {
     if(g.parcelas&&g.parcelas.length>0){
       g.parcelas.forEach(p=>{
         const dp=new Date(p.vencimento+'T00:00:00');
-        if(dp>=hoje&&p.status!=='pago') proximas.push({desc:g.descricao||'Parcela',valor:p.valor,data:dp,tipo:'parcela'});
+        if(dp>=hoje&&p.status!=='pago') proximas.push({gastoId:g.id,parcelaNum:p.numero,desc:g.descricao||'Parcela',valor:p.valor,data:dp,tipo:'parcela',totalParcelas:g.totalParcelas});
       });
     } else if(g.status==='pendente'&&g.data){
       const dp=new Date(g.data+'T00:00:00');
-      if(dp>=hoje) proximas.push({desc:g.descricao||getCat(g.categoria).label,valor:g.valor,data:dp,tipo:'pendente'});
+      if(dp>=hoje) proximas.push({gastoId:g.id,parcelaNum:null,desc:g.descricao||getCat(g.categoria).label,valor:g.valor,data:dp,tipo:'pendente'});
     }
   });
   proximas.sort((a,b)=>a.data-b.data);
-  const proxima = proximas[0];
-  const proximaTexto = proxima
-    ? `${proxima.desc} — ${fmtR(proxima.valor)} · ${proxima.data.toLocaleDateString('pt-BR')}`
-    : 'Nenhuma conta próxima';
+  const dataProxima = proximas.length>0 ? proximas[0].data : null;
+  const contasProximas = dataProxima ? proximas.filter(p=>p.data.getTime()===dataProxima.getTime()) : [];
 
   // Gasto do mês atual
   const mesAtual = new Date().getMonth();
@@ -868,11 +866,20 @@ function renderDashboard() {
     </div>
 
     <!-- PRÓXIMA CONTA -->
-    <div class="card" style="margin-bottom:12px;${proxima?'border-left:3px solid var(--amber)':''}">
-      <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px">⏰ Próxima conta a vencer</div>
-      <div style="font-size:13px;font-weight:${proxima?'500':'400'};color:${proxima?'var(--amber)':'var(--text-muted)'}">
-        ${proximaTexto}
+    <div class="card" style="margin-bottom:12px;cursor:pointer;${contasProximas.length>0?'border-left:3px solid var(--amber)':''}" onclick="abrirContasVencer()">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.6px">⏰ Próxima conta a vencer ›</div>
+        ${contasProximas.length>0?`<span style="font-size:11px;color:var(--amber);font-weight:500">${dataProxima.toLocaleDateString('pt-BR')}</span>`:''}
       </div>
+      ${contasProximas.length===0
+        ? `<div style="font-size:13px;color:var(--text-muted)">Nenhuma conta próxima</div>`
+        : contasProximas.map(c=>`
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--border)">
+            <div style="font-size:13px;font-weight:500;color:var(--amber)">${c.desc}${c.tipo==='parcela'?` · ${c.parcelaNum}/${c.totalParcelas}`:''}</div>
+            <div style="font-size:13px;font-weight:600;color:var(--amber)">${fmtR(c.valor)}</div>
+          </div>`).join('')
+      }
+      ${contasProximas.length>0?`<div style="font-size:11px;color:var(--text-hint);margin-top:6px">Toque para ver todas e marcar como pagas</div>`:''}
     </div>
 
     <!-- GASTO DO MÊS + DIAS SEM LANÇAMENTO -->
@@ -2372,6 +2379,112 @@ window.deletarTarefa = function(id) {
     danger: true,
     onConfirm: async () => {
       try { await deleteDoc(doc(db,'tarefas',id)); showToast('Tarefa excluída!'); } catch(e){ showToast('Erro ao excluir.'); }
+    }
+  });
+};
+
+window.abrirContasVencer = function() {
+  const overlay = document.getElementById('modal-overlay');
+  const mc = document.getElementById('modal-content');
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  const lista = [];
+
+  gastos.forEach(g=>{
+    if(g.parcelas&&g.parcelas.length>0){
+      g.parcelas.forEach(p=>{
+        const dp=new Date(p.vencimento+'T00:00:00');
+        if(dp>=hoje&&p.status!=='pago') lista.push({
+          gastoId:g.id, parcelaNum:p.numero, totalParcelas:g.totalParcelas,
+          desc:g.descricao||'Parcela', valor:p.valor, data:dp, tipo:'parcela',
+          categoria:g.categoria
+        });
+      });
+    } else if(g.status==='pendente'&&g.data){
+      const dp=new Date(g.data+'T00:00:00');
+      if(dp>=hoje) lista.push({
+        gastoId:g.id, parcelaNum:null,
+        desc:g.descricao||getCat(g.categoria).label,
+        valor:g.valor, data:dp, tipo:'pendente', categoria:g.categoria
+      });
+    }
+  });
+  lista.sort((a,b)=>a.data-b.data);
+
+  // Group by date
+  const grupos = {};
+  lista.forEach(c=>{
+    const key = c.data.toLocaleDateString('pt-BR');
+    if(!grupos[key]) grupos[key] = [];
+    grupos[key].push(c);
+  });
+
+  const linhas = Object.keys(grupos).length===0
+    ? `<div class="empty"><div class="empty-icon">🎉</div><p>Nenhuma conta a vencer!</p></div>`
+    : Object.entries(grupos).map(([data, contas])=>{
+        const isHoje = contas[0].data.getTime()===hoje.getTime();
+        const isManha = contas[0].data < hoje;
+        return `
+          <div style="margin-bottom:12px">
+            <div style="font-size:11px;font-weight:600;color:${isHoje?'var(--red)':'var(--text-muted)'};text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px;padding:4px 0;border-bottom:1px solid var(--border)">
+              ${isHoje?'🔴 Hoje — ':''}${data}
+            </div>
+            ${contas.map(c=>{
+              const cat = getCat(c.categoria);
+              return `<div class="gasto-item">
+                <div class="gasto-icon" style="background:${cat.cor}22">${cat.icon}</div>
+                <div class="gasto-info">
+                  <div class="gi-cat">${c.desc}</div>
+                  <div class="gi-desc">${cat.label}${c.tipo==='parcela'?` · Parcela ${c.parcelaNum}/${c.totalParcelas}':''}</div>
+                  <div class="gasto-actions">
+                    <button class="btn-edit" onclick="marcarContaPaga('${c.gastoId}',${c.parcelaNum?c.parcelaNum:'null'},'${c.tipo}')">✅ Marcar como paga</button>
+                  </div>
+                </div>
+                <div class="gasto-valor">
+                  <div class="gv-val pendente">${fmtR(c.valor)}</div>
+                  <div class="gv-status"><span class="tag pendente">Pendente</span></div>
+                </div>
+              </div>`;
+            }).join('')}
+          </div>`;
+      }).join('');
+
+  mc.innerHTML = `
+    <div class="modal-handle"></div>
+    <div class="modal-title">Contas a vencer</div>
+    <div class="card" style="margin-bottom:12px;padding:12px 16px">
+      <div style="display:flex;justify-content:space-between">
+        <span style="font-size:13px;color:var(--text-muted)">Total pendente</span>
+        <span style="font-size:15px;font-weight:600;color:var(--amber)">${fmtR(lista.reduce((s,c)=>s+(c.valor||0),0))}</span>
+      </div>
+    </div>
+    <div class="modal-scroll-list">${linhas}</div>
+    <div class="modal-footer"><button class="btn-fechar" onclick="fecharModal()">✕ Fechar</button></div>
+  `;
+  overlay.classList.add('open');
+};
+
+window.marcarContaPaga = function(gastoId, parcelaNum, tipo) {
+  showConfirm({
+    titulo: 'Confirmar pagamento',
+    mensagem: tipo==='parcela' ? 'Deseja marcar esta parcela como paga?' : 'Deseja marcar esta conta como paga?',
+    confirmLabel: '✅ Confirmar',
+    danger: false,
+    onConfirm: async () => {
+      try {
+        if(tipo==='parcela') {
+          const gasto = gastos.find(g=>g.id===gastoId);
+          if(!gasto) return;
+          const novasParcelas = gasto.parcelas.map(p=>
+            p.numero===parcelaNum ? {...p, status:'pago'} : p
+          );
+          await updateDoc(doc(db,'gastos',gastoId), {parcelas: novasParcelas, atualizadoEm: new Date().toISOString()});
+        } else {
+          await updateDoc(doc(db,'gastos',gastoId), {status:'pago', atualizadoEm: new Date().toISOString()});
+        }
+        showToast('Conta marcada como paga!');
+        fecharModal();
+        setTimeout(abrirContasVencer, 300);
+      } catch(e) { showToast('Erro ao atualizar.'); console.error(e); }
     }
   });
 };
