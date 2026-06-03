@@ -257,6 +257,8 @@ let etapas = [];
 let diarias = [];
 let serventes = [];
 let aportes = [];
+let tarefas = [];
+let unsubTarefas = null;
 let profissionais = [...PROFISSIONAIS_PADRAO];
 let unsubDiarias = null;
 let unsubServentes = null;
@@ -709,6 +711,25 @@ window.marcarParcelaPaga = function(gastoId, parcelaNum) {
   });
 };
 
+function calcProgressoEtapa(etapaNum) {
+  const ts = tarefas.filter(t=>t.etapa===etapaNum);
+  if(ts.length===0) return {total:0, concluidas:0, pct:0};
+  const concluidas = ts.filter(t=>t.concluida).length;
+  return {total:ts.length, concluidas, pct:Math.round(concluidas/ts.length*100)};
+}
+
+function calcProgressoGeral() {
+  // Progresso baseado nas tarefas de todas as etapas que têm tarefas cadastradas
+  const etapasComTarefas = [...new Set(tarefas.map(t=>t.etapa))];
+  if(etapasComTarefas.length===0) {
+    // fallback: etapas liberadas
+    return {pct: Math.round(etapas.filter(e=>e.liberado).length/12*100), base:'etapas'};
+  }
+  const totalTarefas = tarefas.length;
+  const concluidas = tarefas.filter(t=>t.concluida).length;
+  return {pct: Math.round(concluidas/totalTarefas*100), base:'tarefas', total:totalTarefas, concluidas};
+}
+
 function calcSaldos() {
   const totalCaixaBruto = etapas.filter(e=>e.liberado).reduce((s,e)=>s+(e.valorBruto||0),0);
   const totalTaxasEtapas = etapas.filter(e=>e.liberado).reduce((s,e)=>s+(e.taxas||0),0);
@@ -787,7 +808,8 @@ function renderDashboard() {
 
   // Progresso da obra
   const etapasFeitas = etapas.filter(e=>e.liberado).length;
-  const progresso = Math.round(etapasFeitas/12*100);
+  const progressoGeral = calcProgressoGeral();
+  const progresso = progressoGeral.pct;
 
   // Próxima conta a vencer
   const hoje = new Date(); hoje.setHours(0,0,0,0);
@@ -834,14 +856,15 @@ function renderDashboard() {
 
   return `
     <!-- PROGRESSO DA OBRA -->
-    <div class="card" style="margin-bottom:12px">
+    <div class="card" style="margin-bottom:12px;cursor:pointer" onclick="abrirProgressoObra()">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-        <div style="font-size:13px;font-weight:500">🏗️ Progresso da obra</div>
-        <div style="font-size:13px;font-weight:600;color:var(--green-mid)">${etapasFeitas} de 12 etapas · ${progresso}%</div>
+        <div style="font-size:13px;font-weight:500">🏗️ Progresso da obra ›</div>
+        <div style="font-size:13px;font-weight:600;color:var(--green-mid)">${progresso}%</div>
       </div>
-      <div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden">
+      <div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden;margin-bottom:6px">
         <div style="height:100%;width:${progresso}%;background:var(--green-accent);border-radius:4px;transition:width 0.5s"></div>
       </div>
+      <div style="font-size:11px;color:var(--text-muted)">${etapasFeitas} etapas liberadas · ${progressoGeral.base==='tarefas'?progressoGeral.concluidas+' de '+progressoGeral.total+' tarefas concluídas':'baseado nas etapas liberadas'}</div>
     </div>
 
     <!-- PRÓXIMA CONTA -->
@@ -1027,9 +1050,11 @@ function renderEtapaItem(num, et) {
     <div style="font-size:11px;color:var(--text-muted);margin-top:6px">Data: ${data}</div>
     ${et.obs?`<div style="font-size:11px;color:var(--text-muted);margin-top:2px">${et.obs}</div>`:''}
     <div class="gasto-actions">
+      <button class="btn-edit" onclick="abrirTarefasEtapa(${num})">📋 Tarefas</button>
       <button class="btn-del" onclick="deletarEtapa('${et.id}')">🗑️ Excluir</button>
     </div>
-    `:`<div style="font-size:12px;color:var(--text-hint);margin-top:2px">Aguardando liberação da Caixa</div>`}
+    `:`<div style="font-size:12px;color:var(--text-hint);margin-top:2px">Aguardando liberação da Caixa</div>
+    <div class="gasto-actions"><button class="btn-edit" onclick="abrirTarefasEtapa(${num})">📋 Tarefas</button></div>`}
   </div>`;
 }
 
@@ -1697,6 +1722,10 @@ function subscribeData() {
     aportes = snap.docs.map(d=>({id:d.id,...d.data()}));
     render();
   });
+  unsubTarefas = onSnapshot(collection(db,'tarefas'), snap=>{
+    tarefas = snap.docs.map(d=>({id:d.id,...d.data()}));
+    render();
+  });
 }
 
 // ===================== AUTH =====================
@@ -1810,7 +1839,8 @@ window.exportarBackup = async function() {
       etapas,
       diarias,
       serventes,
-      aportes
+      aportes,
+      tarefas
     };
     const json = JSON.stringify(backup, null, 2);
     const blob = new Blob([json], {type: 'application/json'});
@@ -2163,12 +2193,196 @@ window.gerarPDFGeral = function() {
 };
 
 
+window.abrirProgressoObra = function() {
+  const overlay = document.getElementById('modal-overlay');
+  const mc = document.getElementById('modal-content');
+  const pg = calcProgressoGeral();
+
+  const linhas = Array.from({length:12},(_,i)=>{
+    const num = i+1;
+    const et = etapas.find(e=>e.numero===num);
+    const prog = calcProgressoEtapa(num);
+    const liberada = et && et.liberado;
+    return `<div class="card" style="margin-bottom:8px;cursor:pointer" onclick="abrirTarefasEtapa(${num})">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <div style="font-size:13px;font-weight:500">Etapa ${num}</div>
+        <div style="display:flex;align-items:center;gap:6px">
+          ${liberada?'<span style="font-size:10px;background:var(--green-light);color:var(--green-mid);padding:2px 7px;border-radius:10px;font-weight:500">Liberada</span>':''}
+          <span style="font-size:12px;font-weight:600;color:var(--green-mid)">${prog.pct}%</span>
+          <span style="font-size:11px;color:var(--text-hint)">›</span>
+        </div>
+      </div>
+      <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden;margin-bottom:4px">
+        <div style="height:100%;width:${prog.pct}%;background:${prog.pct===100?'var(--green-accent)':'var(--green-mid)'};border-radius:3px;transition:width 0.5s"></div>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted)">${prog.total===0?'Nenhuma tarefa cadastrada':prog.concluidas+' de '+prog.total+' tarefas concluídas'}</div>
+    </div>`;
+  }).join('');
+
+  mc.innerHTML = `
+    <div class="modal-handle"></div>
+    <div class="modal-title">Progresso da Obra</div>
+    <div class="card" style="margin-bottom:12px;padding:12px 16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <span style="font-size:13px;font-weight:500">Progresso geral</span>
+        <span style="font-size:20px;font-weight:700;color:var(--green-mid)">${pg.pct}%</span>
+      </div>
+      <div style="height:10px;background:var(--border);border-radius:5px;overflow:hidden">
+        <div style="height:100%;width:${pg.pct}%;background:var(--green-accent);border-radius:5px;transition:width 0.5s"></div>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:6px">${pg.base==='tarefas'?pg.concluidas+' de '+pg.total+' tarefas concluídas':etapas.filter(e=>e.liberado).length+' de 12 etapas liberadas'}</div>
+    </div>
+    <div class="section-title">Etapas — toque para gerenciar tarefas</div>
+    <div class="modal-scroll-list">${linhas}</div>
+    <div class="modal-footer"><button class="btn-fechar" onclick="fecharModal()">✕ Fechar</button></div>
+  `;
+  overlay.classList.add('open');
+};
+
+window.abrirTarefasEtapa = function(num) {
+  const overlay = document.getElementById('modal-overlay');
+  const mc = document.getElementById('modal-content');
+  const tsDaEtapa = tarefas.filter(t=>t.etapa===num).sort((a,b)=>new Date(a.criadoEm)-new Date(b.criadoEm));
+  const prog = calcProgressoEtapa(num);
+  const et = etapas.find(e=>e.numero===num);
+
+  const linhasTarefas = tsDaEtapa.length===0
+    ? `<div class="empty"><div class="empty-icon">📋</div><p>Nenhuma tarefa cadastrada ainda</p></div>`
+    : tsDaEtapa.map(t=>`
+      <div class="gasto-item" style="align-items:flex-start">
+        <div onclick="toggleTarefa('${t.id}',${!t.concluida},${num})" style="width:22px;height:22px;border-radius:6px;border:2px solid ${t.concluida?'var(--green-mid)':'var(--border)'};background:${t.concluida?'var(--green-mid)':'transparent'};display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;margin-top:2px">
+          ${t.concluida?'<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>':''}
+        </div>
+        <div class="gasto-info" style="flex:1">
+          <div class="gi-cat" style="${t.concluida?'text-decoration:line-through;color:var(--text-muted)':''}"> ${t.nome}</div>
+          ${t.obs?`<div class="gi-desc">${t.obs}</div>`:''}
+          <div class="gasto-actions">
+            <button class="btn-del" onclick="deletarTarefa('${t.id}')">🗑️ Excluir</button>
+          </div>
+        </div>
+        <div style="font-size:11px;color:${t.concluida?'var(--green-mid)':'var(--text-hint)'};flex-shrink:0;text-align:right">
+          ${t.concluida?'✅ Feito':'Pendente'}
+          ${t.concluida&&t.concluidaEm?`<div style="font-size:10px;color:var(--text-hint)">${new Date(t.concluidaEm+'T00:00:00').toLocaleDateString('pt-BR')}</div>`:''}
+        </div>
+      </div>`).join('');
+
+  mc.innerHTML = `
+    <div class="modal-handle"></div>
+    <div class="modal-title">Etapa ${num}</div>
+    ${et&&et.liberado?`<div style="font-size:12px;color:var(--green-mid);margin-bottom:8px">✅ Etapa liberada pela Caixa em ${et.data?new Date(et.data+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</div>`:''}
+    <div class="card" style="margin-bottom:12px;padding:12px 16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span style="font-size:13px;font-weight:500">Progresso da etapa</span>
+        <span style="font-size:16px;font-weight:700;color:var(--green-mid)">${prog.pct}%</span>
+      </div>
+      <div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden;margin-bottom:4px">
+        <div style="height:100%;width:${prog.pct}%;background:var(--green-accent);border-radius:4px"></div>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted)">${prog.total===0?'Nenhuma tarefa ainda':prog.concluidas+' de '+prog.total+' tarefas concluídas'}</div>
+    </div>
+    <div class="section-title">Tarefas</div>
+    <div class="modal-scroll-list">${linhasTarefas}</div>
+    <div style="margin-top:12px">
+      <div class="form-group">
+        <label class="form-label">Nova tarefa</label>
+        <input class="form-input" id="nova-tarefa-nome-${num}" type="text" placeholder="Ex: Concretagem da laje">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Observação (opcional)</label>
+        <input class="form-input" id="nova-tarefa-obs-${num}" type="text" placeholder="Detalhes...">
+      </div>
+      <button class="btn-primary" onclick="adicionarTarefa(${num})" style="margin-top:0">+ Adicionar tarefa</button>
+    </div>
+    <div class="modal-footer"><button class="btn-fechar" onclick="fecharModal();setTimeout(abrirProgressoObra,200)">‹ Voltar</button></div>
+  `;
+  overlay.classList.add('open');
+};
+
+window.adicionarTarefa = async function(etapaNum) {
+  const nomeEl = document.getElementById(`nova-tarefa-nome-${etapaNum}`);
+  const obsEl = document.getElementById(`nova-tarefa-obs-${etapaNum}`);
+  const nome = nomeEl?.value.trim();
+  if(!nome) { showToast('Digite o nome da tarefa'); return; }
+  try {
+    await addDoc(collection(db,'tarefas'), {
+      etapa: etapaNum,
+      nome,
+      obs: obsEl?.value.trim()||'',
+      concluida: false,
+      uid: currentUser.uid,
+      criadoEm: new Date().toISOString()
+    });
+    showToast('Tarefa adicionada!');
+    setTimeout(()=>abrirTarefasEtapa(etapaNum), 300);
+  } catch(e) { showToast('Erro ao salvar.'); console.error(e); }
+};
+
+window.toggleTarefa = function(id, concluida, etapaNum) {
+  if(concluida) {
+    // Ask for completion date
+    const overlay = document.getElementById('modal-overlay');
+    const mc = document.getElementById('modal-content');
+    const hoje = new Date().toISOString().slice(0,10);
+    mc.innerHTML = `
+      <div class="modal-handle"></div>
+      <div class="modal-title">Data de conclusão</div>
+      <div class="form-group" style="margin-bottom:0">
+        <label class="form-label">Quando esta tarefa foi concluída?</label>
+        <input class="form-input" id="data-conclusao" type="date" value="${hoje}">
+      </div>
+      <button class="btn-primary" id="btn-confirmar-conclusao" style="margin-top:16px">✅ Confirmar conclusão</button>
+      <button class="btn-secondary" onclick="fecharModal();setTimeout(()=>abrirTarefasEtapa(${etapaNum}),200)">Cancelar</button>
+    `;
+    overlay.classList.add('open');
+    document.getElementById('btn-confirmar-conclusao').onclick = async () => {
+      const data = document.getElementById('data-conclusao').value;
+      if(!data) { showToast('Selecione a data de conclusão'); return; }
+      try {
+        await updateDoc(doc(db,'tarefas',id), {
+          concluida: true,
+          concluidaEm: data
+        });
+        showToast('Tarefa concluída!');
+        fecharModal();
+        setTimeout(()=>abrirTarefasEtapa(etapaNum), 200);
+      } catch(e) { showToast('Erro ao atualizar.'); console.error(e); }
+    };
+  } else {
+    showConfirm({
+      titulo: 'Reabrir tarefa',
+      mensagem: 'Deseja marcar esta tarefa como não concluída?',
+      confirmLabel: 'Confirmar',
+      danger: false,
+      onConfirm: async () => {
+        try {
+          await updateDoc(doc(db,'tarefas',id), { concluida: false, concluidaEm: null });
+          showToast('Tarefa reaberta!');
+          setTimeout(()=>abrirTarefasEtapa(etapaNum), 200);
+        } catch(e) { showToast('Erro ao atualizar.'); console.error(e); }
+      }
+    });
+  }
+};
+
+window.deletarTarefa = function(id) {
+  showConfirm({
+    titulo: 'Excluir tarefa',
+    mensagem: 'Deseja excluir esta tarefa?',
+    confirmLabel: 'Excluir',
+    danger: true,
+    onConfirm: async () => {
+      try { await deleteDoc(doc(db,'tarefas',id)); showToast('Tarefa excluída!'); } catch(e){ showToast('Erro ao excluir.'); }
+    }
+  });
+};
+
 window.fazerLogout = async function() {
   if(unsubGastos) unsubGastos();
   if(unsubEtapas) unsubEtapas();
   if(unsubDiarias) unsubDiarias();
   if(unsubServentes) unsubServentes();
   if(unsubAportes) unsubAportes();
+  if(unsubTarefas) unsubTarefas();
   await signOut(auth);
 };
 
@@ -2218,7 +2432,7 @@ function showConfirm({titulo, mensagem, confirmLabel='Confirmar', danger=false, 
 // ===================== INIT =====================
 onAuthStateChanged(auth, user=>{
   currentUser = user;
-  if(user) { subscribeData(); } else { gastos=[]; etapas=[]; diarias=[]; serventes=[]; aportes=[]; render(); }
+  if(user) { subscribeData(); } else { gastos=[]; etapas=[]; diarias=[]; serventes=[]; aportes=[]; tarefas=[]; render(); }
 });
 
 
