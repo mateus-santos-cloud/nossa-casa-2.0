@@ -869,17 +869,13 @@ function renderDashboard() {
     <div class="card" style="margin-bottom:12px;cursor:pointer;${contasProximas.length>0?'border-left:3px solid var(--amber)':''}" onclick="abrirContasVencer()">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
         <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.6px">⏰ Próxima conta a vencer ›</div>
-        ${contasProximas.length>0?`<span style="font-size:11px;color:var(--amber);font-weight:500">${dataProxima.toLocaleDateString('pt-BR')}</span>`:''}
+        ${contasProximas.length>0?('<span style="font-size:11px;color:var(--amber);font-weight:500">'+dataProxima.toLocaleDateString('pt-BR')+'</span>'):''}
       </div>
       ${contasProximas.length===0
-        ? `<div style="font-size:13px;color:var(--text-muted)">Nenhuma conta próxima</div>`
-        : contasProximas.map(c=>`
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--border)">
-            <div style="font-size:13px;font-weight:500;color:var(--amber)">${c.desc}${c.tipo==='parcela'?` · ${c.parcelaNum}/${c.totalParcelas}`:''}</div>
-            <div style="font-size:13px;font-weight:600;color:var(--amber)">${fmtR(c.valor)}</div>
-          </div>`).join('')
+        ? '<div style="font-size:13px;color:var(--text-muted)">Nenhuma conta próxima</div>'
+        : contasProximas.map(c=>'<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--border)"><div style="font-size:13px;font-weight:500;color:var(--amber)">'+c.desc+(c.tipo==='parcela'?' · '+c.parcelaNum+'/'+c.totalParcelas:'')+'</div><div style="font-size:13px;font-weight:600;color:var(--amber)">'+fmtR(c.valor)+'</div></div>').join('')
       }
-      ${contasProximas.length>0?`<div style="font-size:11px;color:var(--text-hint);margin-top:6px">Toque para ver todas e marcar como pagas</div>`:''}
+      ${contasProximas.length>0?'<div style="font-size:11px;color:var(--text-hint);margin-top:6px">Toque para ver todas e marcar como pagas</div>':''}
     </div>
 
     <!-- GASTO DO MÊS + DIAS SEM LANÇAMENTO -->
