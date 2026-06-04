@@ -2430,7 +2430,7 @@ window.abrirContasVencer = function() {
                 <div class="gasto-icon" style="background:${cat.cor}22">${cat.icon}</div>
                 <div class="gasto-info">
                   <div class="gi-cat">${c.desc}</div>
-                  <div class="gi-desc">${cat.label}${c.tipo==='parcela'?` · Parcela ${c.parcelaNum}/${c.totalParcelas}':''}</div>
+                   <div class="gi-desc">${cat.label+(c.tipo==='parcela'?' · Parcela '+c.parcelaNum+'/'+c.totalParcelas:'')}</div>
                   <div class="gasto-actions">
                     <button class="btn-edit" onclick="marcarContaPaga('${c.gastoId}',${c.parcelaNum?c.parcelaNum:'null'},'${c.tipo}')">✅ Marcar como paga</button>
                   </div>
