@@ -2258,21 +2258,21 @@ window.abrirTarefasEtapa = function(num) {
         </div>
         <div class="gasto-info" style="flex:1">
           <div class="gi-cat" style="${t.concluida?'text-decoration:line-through;color:var(--text-muted)':''}"> ${t.nome}</div>
-          ${t.obs?`<div class="gi-desc">${t.obs}</div>`:''}
+          ${t.obs?('<div class="gi-desc">'+t.obs+'</div>'):''}
           <div class="gasto-actions">
             <button class="btn-del" onclick="deletarTarefa('${t.id}')">🗑️ Excluir</button>
           </div>
         </div>
         <div style="font-size:11px;color:${t.concluida?'var(--green-mid)':'var(--text-hint)'};flex-shrink:0;text-align:right">
           ${t.concluida?'✅ Feito':'Pendente'}
-          ${t.concluida&&t.concluidaEm?`<div style="font-size:10px;color:var(--text-hint)">${new Date(t.concluidaEm+'T00:00:00').toLocaleDateString('pt-BR')}</div>`:''}
+          ${t.concluida&&t.concluidaEm?('<div style="font-size:10px;color:var(--text-hint)">'+new Date(t.concluidaEm+'T00:00:00').toLocaleDateString('pt-BR')+'</div>'):''}
         </div>
       </div>`).join('');
 
   mc.innerHTML = `
     <div class="modal-handle"></div>
     <div class="modal-title">Etapa ${num}</div>
-    ${et&&et.liberado?`<div style="font-size:12px;color:var(--green-mid);margin-bottom:8px">✅ Etapa liberada pela Caixa em ${et.data?new Date(et.data+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</div>`:''}
+    ${et&&et.liberado?('<div style="font-size:12px;color:var(--green-mid);margin-bottom:8px">✅ Etapa liberada pela Caixa em '+(et.data?new Date(et.data+'T00:00:00').toLocaleDateString('pt-BR'):'—')+'</div>'):''}
     <div class="card" style="margin-bottom:12px;padding:12px 16px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
         <span style="font-size:13px;font-weight:500">Progresso da etapa</span>
