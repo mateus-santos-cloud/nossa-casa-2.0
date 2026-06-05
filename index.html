@@ -2242,7 +2242,10 @@ window.abrirProgressoObra = function() {
     </div>
     <div class="section-title">Etapas — toque para gerenciar tarefas</div>
     <div class="modal-scroll-list">${linhas}</div>
-    <div class="modal-footer"><button class="btn-fechar" onclick="fecharModal()">✕ Fechar</button></div>
+    <div class="modal-footer" style="gap:8px">
+      <button onclick="gerarPDFProgressoObra()" style="background:var(--green-light);color:var(--green);border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif">📄 PDF</button>
+      <button class="btn-fechar" onclick="fecharModal()">✕ Fechar</button>
+    </div>
   `;
   overlay.classList.add('open');
 };
@@ -2802,6 +2805,62 @@ window.gerarPDFEtapaTarefas = function(num) {
       : '<table><thead><tr><th>#</th><th>Tarefa</th><th>Data de início</th><th>Data de conclusão</th><th>Status</th></tr></thead><tbody>'+rows+'</tbody></table>');
 
   gerarPDF('Etapa '+num+' — Tarefas', body);
+};
+
+window.gerarPDFProgressoObra = function() {
+  const pg = calcProgressoGeral();
+  const etapasLib = etapas.filter(e=>e.liberado).length;
+
+  const rows = Array.from({length:12}, (_,i)=>{
+    const num = i+1;
+    const prog = calcProgressoEtapa(num);
+    const et = etapas.find(e=>e.numero===num);
+    const liberada = et && et.liberado;
+    const tsDaEtapa = tarefas.filter(t=>t.etapa===num).sort((a,b)=>new Date(a.dataInicio||a.criadoEm)-new Date(b.dataInicio||b.criadoEm));
+
+    const tarefasRows = tsDaEtapa.length===0
+      ? '<tr><td colspan="4" style="color:#999;font-style:italic">Nenhuma tarefa cadastrada</td></tr>'
+      : tsDaEtapa.map(t=>{
+          const inicio = t.dataInicio ? new Date(t.dataInicio+'T00:00:00').toLocaleDateString('pt-BR') : '—';
+          const fim = t.concluidaEm ? new Date(t.concluidaEm+'T00:00:00').toLocaleDateString('pt-BR') : '—';
+          const status = t.concluida
+            ? '<span style="background:#e8f5f0;color:#2d6b55;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:600">✅ Concluída</span>'
+            : '<span style="background:#fdf3e3;color:#c17f24;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:600">Pendente</span>';
+          return '<tr><td>'+t.nome+(t.obs?'<br><small style="color:#888">'+t.obs+'</small>':'')+'</td><td>'+inicio+'</td><td>'+fim+'</td><td>'+status+'</td></tr>';
+        }).join('');
+
+    return '<div style="margin-bottom:24px;page-break-inside:avoid">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;background:#f7f5f0;border-radius:8px;padding:10px 14px;margin-bottom:8px;border-left:3px solid '+(prog.pct===100?'#4caf87':'#1a4a3a')+'">'
+        +'<div>'
+          +'<strong style="font-size:13px">Etapa '+num+'</strong>'
+          +(liberada?'<span style="margin-left:8px;background:#e8f5f0;color:#2d6b55;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:600">Liberada</span>':'')
+        +'</div>'
+        +'<div style="text-align:right">'
+          +'<strong style="color:'+(prog.pct===100?'#2d6b55':'#1a4a3a')+'">'+prog.pct+'%</strong>'
+          +'<div style="font-size:10px;color:#888">'+prog.concluidas+'/'+prog.total+' tarefas</div>'
+        +'</div>'
+      +'</div>'
+      +'<div style="height:6px;background:#e0ddd6;border-radius:3px;overflow:hidden;margin-bottom:10px">'
+        +'<div style="height:100%;width:'+prog.pct+'%;background:#4caf87;border-radius:3px"></div>'
+      +'</div>'
+      +(tsDaEtapa.length>0
+        ? '<table><thead><tr><th>Tarefa</th><th>Data de início</th><th>Data de conclusão</th><th>Status</th></tr></thead><tbody>'+tarefasRows+'</tbody></table>'
+        : '<p style="color:#999;font-size:12px;padding:4px 0 8px">Nenhuma tarefa cadastrada nesta etapa.</p>')
+    +'</div>';
+  }).join('');
+
+  const body = '<div class="rg">'
+    +'<div class="rc green"><div class="rl">Progresso geral</div><div class="rv">'+pg.pct+'%</div></div>'
+    +'<div class="rc"><div class="rl">Etapas liberadas</div><div class="rv">'+etapasLib+' de 12</div></div>'
+    +(pg.base==='tarefas'?'<div class="rc green"><div class="rl">Tarefas concluídas</div><div class="rv">'+pg.concluidas+'</div></div><div class="rc"><div class="rl">Total de tarefas</div><div class="rv">'+pg.total+'</div></div>':'')
+    +'</div>'
+    +'<div style="height:10px;background:#e0ddd6;border-radius:5px;overflow:hidden;margin-bottom:24px">'
+      +'<div style="height:100%;width:'+pg.pct+'%;background:#4caf87;border-radius:5px"></div>'
+    +'</div>'
+    +'<h2>Detalhes por etapa</h2>'
+    +rows;
+
+  gerarPDF('Progresso da Obra', body);
 };
 
 window.fazerLogout = async function() {
