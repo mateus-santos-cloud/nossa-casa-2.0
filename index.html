@@ -890,13 +890,12 @@ function renderDashboard() {
         <div class="sc-val red">${fmtR(gastoMes)}</div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:2px">ver detalhes ›</div>
       </div>
-      <div class="stat-card" style="cursor:pointer;${diasSemLanc>=3?'border-left:3px solid var(--amber)':''}" onclick="abrirHistoricoLancamentos()">
-        <div class="sc-label">📝 Sem lançamento ›</div>
-        <div class="sc-val" style="color:${diasSemLanc>=3?'var(--amber)':'var(--green-mid)'}">
-          ${diasSemLanc===0?'Hoje':'há '+diasSemLanc+' dia'+(diasSemLanc!==1?'s':'')}
-        </div>
-        <div style="font-size:11px;color:var(--text-hint);margin-top:2px">ver histórico ›</div>
-      </div>
+      ${(function(){
+        const borderStyle = diasSemLanc>=3 ? 'border-left:3px solid #c17f24' : '';
+        const color = diasSemLanc>=3 ? '#c17f24' : '#2d6b55';
+        const txt = diasSemLanc===0?'Hoje':'há '+diasSemLanc+' dia'+(diasSemLanc!==1?'s':'');
+        return '<div class="stat-card" style="cursor:pointer;'+borderStyle+'" onclick="abrirHistoricoLancamentos()"><div class="sc-label">📝 Sem lançamento ›</div><div class="sc-val" style="color:'+color+'">'+txt+'</div><div style="font-size:11px;color:var(--text-hint);margin-top:2px">ver histórico ›</div></div>';
+      })()}
     </div>
 
     <!-- PEDREIRO E SERVENTE DO MÊS -->
