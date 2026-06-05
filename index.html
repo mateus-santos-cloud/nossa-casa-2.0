@@ -2256,23 +2256,25 @@ window.abrirTarefasEtapa = function(num) {
 
   const linhasTarefas = tsDaEtapa.length===0
     ? `<div class="empty"><div class="empty-icon">📋</div><p>Nenhuma tarefa cadastrada ainda</p></div>`
-    : tsDaEtapa.map(t=>`
-      <div class="gasto-item" style="align-items:flex-start">
-        <div onclick="toggleTarefa('${t.id}',${!t.concluida},${num})" style="width:22px;height:22px;border-radius:6px;border:2px solid ${t.concluida?'var(--green-mid)':'var(--border)'};background:${t.concluida?'var(--green-mid)':'transparent'};display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;margin-top:2px">
-          ${t.concluida?'<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>':''}
+    : tsDaEtapa.map(t=>{
+    const inicioFmt = t.dataInicio ? new Date(t.dataInicio+'T00:00:00').toLocaleDateString('pt-BR') : '';
+    const fimFmt = t.concluidaEm ? new Date(t.concluidaEm+'T00:00:00').toLocaleDateString('pt-BR') : '';
+    const checkIcon = t.concluida ? '<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>' : '';
+    const novaConcluida = !t.concluida;
+    return `<div class="gasto-item" style="align-items:flex-start">
+      <div onclick="toggleTarefa('${t.id}',${novaConcluida},${num})" style="width:22px;height:22px;border-radius:6px;border:2px solid ${t.concluida?'var(--green-mid)':'var(--border)'};background:${t.concluida?'var(--green-mid)':'transparent'};display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;margin-top:2px">${checkIcon}</div>
+      <div class="gasto-info" style="flex:1">
+        <div class="gi-cat" style="${t.concluida?'text-decoration:line-through;color:var(--text-muted)':''}">${t.nome||''}</div>
+        ${t.obs?('<div class="gi-desc">'+t.obs+'</div>'):''}
+        <div class="gi-data">${inicioFmt?'Início: '+inicioFmt:''}${fimFmt?' · Conclusão: '+fimFmt:''}</div>
+        <div class="gasto-actions">
+          <button class="btn-edit" onclick="editarTarefa('${t.id}',${num})">✏️ Editar</button>
+          <button class="btn-del" onclick="deletarTarefa('${t.id}')">🗑️ Excluir</button>
         </div>
-        <div class="gasto-info" style="flex:1">
-          <div class="gi-cat" style="${t.concluida?'text-decoration:line-through;color:var(--text-muted)':''}"> ${t.nome}</div>
-          ${t.obs?('<div class="gi-desc">'+t.obs+'</div>'):''}
-          <div class="gasto-actions">
-            <button class="btn-del" onclick="deletarTarefa('${t.id}')">🗑️ Excluir</button>
-          </div>
-        </div>
-        <div style="font-size:11px;color:${t.concluida?'var(--green-mid)':'var(--text-hint)'};flex-shrink:0;text-align:right">
-          ${t.concluida?'✅ Feito':'Pendente'}
-          ${t.concluida&&t.concluidaEm?('<div style="font-size:10px;color:var(--text-hint)">'+new Date(t.concluidaEm+'T00:00:00').toLocaleDateString('pt-BR')+'</div>'):''}
-        </div>
-      </div>`).join('');
+      </div>
+      <div style="font-size:11px;color:${t.concluida?'var(--green-mid)':'var(--text-hint)'};flex-shrink:0;text-align:right">${t.concluida?'✅ Feito':'Pendente'}</div>
+    </div>`;
+  }).join('');
 
   mc.innerHTML = `
     <div class="modal-handle"></div>
@@ -2292,8 +2294,12 @@ window.abrirTarefasEtapa = function(num) {
     <div class="modal-scroll-list">${linhasTarefas}</div>
     <div style="margin-top:12px">
       <div class="form-group">
-        <label class="form-label">Nova tarefa</label>
+        <label class="form-label">Nome da tarefa</label>
         <input class="form-input" id="nova-tarefa-nome-${num}" type="text" placeholder="Ex: Concretagem da laje">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Data de início</label>
+        <input class="form-input" id="nova-tarefa-inicio-${num}" type="date" value="${new Date().toISOString().slice(0,10)}">
       </div>
       <div class="form-group">
         <label class="form-label">Observação (opcional)</label>
@@ -2301,21 +2307,28 @@ window.abrirTarefasEtapa = function(num) {
       </div>
       <button class="btn-primary" onclick="adicionarTarefa(${num})" style="margin-top:0">+ Adicionar tarefa</button>
     </div>
-    <div class="modal-footer"><button class="btn-fechar" onclick="fecharModal();setTimeout(abrirProgressoObra,200)">‹ Voltar</button></div>
+    <div class="modal-footer" style="gap:8px">
+      <button onclick="gerarPDFEtapaTarefas(${num})" style="background:var(--green-light);color:var(--green);border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif">📄 PDF</button>
+      <button class="btn-fechar" onclick="fecharModal();setTimeout(abrirProgressoObra,200)">‹ Voltar</button>
+    </div>
   `;
   overlay.classList.add('open');
 };
 
 window.adicionarTarefa = async function(etapaNum) {
-  const nomeEl = document.getElementById(`nova-tarefa-nome-${etapaNum}`);
-  const obsEl = document.getElementById(`nova-tarefa-obs-${etapaNum}`);
+  const nomeEl = document.getElementById('nova-tarefa-nome-'+etapaNum);
+  const obsEl = document.getElementById('nova-tarefa-obs-'+etapaNum);
+  const inicioEl = document.getElementById('nova-tarefa-inicio-'+etapaNum);
   const nome = nomeEl?.value.trim();
+  const inicio = inicioEl?.value;
   if(!nome) { showToast('Digite o nome da tarefa'); return; }
+  if(!inicio) { showToast('Informe a data de início'); return; }
   try {
     await addDoc(collection(db,'tarefas'), {
       etapa: etapaNum,
       nome,
       obs: obsEl?.value.trim()||'',
+      dataInicio: inicio,
       concluida: false,
       uid: currentUser.uid,
       criadoEm: new Date().toISOString()
@@ -2715,6 +2728,80 @@ window.abrirHistoricoLancamentos = function(limite=10) {
     <div class="modal-footer"><button class="btn-fechar" onclick="fecharModal()">✕ Fechar</button></div>
   `;
   overlay.classList.add('open');
+};
+
+window.editarTarefa = function(id, etapaNum) {
+  const t = tarefas.find(x=>x.id===id);
+  if(!t) return;
+  const overlay = document.getElementById('modal-overlay');
+  const mc = document.getElementById('modal-content');
+  mc.innerHTML = `
+    <div class="modal-handle"></div>
+    <div class="modal-title">Editar tarefa</div>
+    <div class="form-group">
+      <label class="form-label">Nome da tarefa</label>
+      <input class="form-input" id="edit-nome" type="text" value="${t.nome||''}">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Data de início</label>
+      <input class="form-input" id="edit-inicio" type="date" value="${t.dataInicio||''}">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Observação (opcional)</label>
+      <input class="form-input" id="edit-obs" type="text" value="${t.obs||''}">
+    </div>
+    <button class="btn-primary" id="btn-salvar-edit">Salvar alterações</button>
+    <button class="btn-secondary" onclick="fecharModal();setTimeout(()=>abrirTarefasEtapa(${etapaNum}),200)">Cancelar</button>
+  `;
+  overlay.classList.add('open');
+  document.getElementById('btn-salvar-edit').onclick = async () => {
+    const nome = document.getElementById('edit-nome').value.trim();
+    const inicio = document.getElementById('edit-inicio').value;
+    const obs = document.getElementById('edit-obs').value.trim();
+    if(!nome) { showToast('Digite o nome da tarefa'); return; }
+    if(!inicio) { showToast('Informe a data de início'); return; }
+    try {
+      await updateDoc(doc(db,'tarefas',id), {nome, dataInicio:inicio, obs});
+      showToast('Tarefa atualizada!');
+      fecharModal();
+      setTimeout(()=>abrirTarefasEtapa(etapaNum), 200);
+    } catch(e) { showToast('Erro ao salvar.'); console.error(e); }
+  };
+};
+
+window.gerarPDFEtapaTarefas = function(num) {
+  const et = etapas.find(e=>e.numero===num);
+  const tsDaEtapa = tarefas.filter(t=>t.etapa===num).sort((a,b)=>new Date(a.dataInicio||a.criadoEm)-new Date(b.dataInicio||b.criadoEm));
+  const prog = calcProgressoEtapa(num);
+  const rows = tsDaEtapa.map((t,i)=>{
+    const inicio = t.dataInicio ? new Date(t.dataInicio+'T00:00:00').toLocaleDateString('pt-BR') : '—';
+    const fim = t.concluidaEm ? new Date(t.concluidaEm+'T00:00:00').toLocaleDateString('pt-BR') : '—';
+    const status = t.concluida ? '<span style="background:#e8f5f0;color:#2d6b55;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">✅ Concluída</span>' : '<span style="background:#fdf3e3;color:#c17f24;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">Pendente</span>';
+    return '<tr>'
+      +'<td>'+(i+1)+'</td>'
+      +'<td><strong>'+t.nome+'</strong>'+(t.obs?'<br><small style="color:#888">'+t.obs+'</small>':'')+'</td>'
+      +'<td>'+inicio+'</td>'
+      +'<td>'+fim+'</td>'
+      +'<td>'+status+'</td>'
+    +'</tr>';
+  }).join('');
+
+  const body = '<div class="rg">'
+    +'<div class="rc"><div class="rl">Total de tarefas</div><div class="rv">'+tsDaEtapa.length+'</div></div>'
+    +'<div class="rc green"><div class="rl">Concluídas</div><div class="rv">'+prog.concluidas+'</div></div>'
+    +'<div class="rc amber"><div class="rl">Pendentes</div><div class="rv">'+(prog.total-prog.concluidas)+'</div></div>'
+    +'<div class="rc green"><div class="rl">Progresso</div><div class="rv">'+prog.pct+'%</div></div>'
+    +'</div>'
+    +'<div style="height:10px;background:#e0ddd6;border-radius:5px;overflow:hidden;margin-bottom:20px">'
+      +'<div style="height:100%;width:'+prog.pct+'%;background:#4caf87;border-radius:5px"></div>'
+    +'</div>'
+    +(et&&et.liberado?'<p style="font-size:12px;color:#2d6b55;margin-bottom:16px">✅ Etapa liberada pela Caixa em '+(et.data?new Date(et.data+'T00:00:00').toLocaleDateString('pt-BR'):'—')+'</p>':'')
+    +'<h2>Tarefas</h2>'
+    +(tsDaEtapa.length===0
+      ? '<p style="color:#999;padding:12px 0">Nenhuma tarefa cadastrada.</p>'
+      : '<table><thead><tr><th>#</th><th>Tarefa</th><th>Data de início</th><th>Data de conclusão</th><th>Status</th></tr></thead><tbody>'+rows+'</tbody></table>');
+
+  gerarPDF('Etapa '+num+' — Tarefas', body);
 };
 
 window.fazerLogout = async function() {
