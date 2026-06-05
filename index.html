@@ -268,7 +268,8 @@ let mesRelatorio = new Date().getMonth();
 let anoRelatorio = new Date().getFullYear();
 let filtroCategoria = 'todos';
 let filtroStatus = 'todos';
-let filtroPeriodo = 'todos';
+const _mesAtualKey = new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0');
+let filtroPeriodo = _mesAtualKey;
 let unsubGastos = null;
 let unsubEtapas = null;
 let editandoGasto = null;
@@ -2974,7 +2975,16 @@ window.fazerLogout = async function() {
 // ===================== BIND =====================
 function bindNav() {
   document.querySelectorAll('.nav-item').forEach(btn=>{
-    btn.addEventListener('click',()=>{ paginaAtual=btn.dataset.page; render(); });
+    btn.addEventListener('click',()=>{
+      if(btn.dataset.page==='gastos' && paginaAtual!=='gastos') {
+        // Reset to current month when entering gastos tab
+        filtroCategoria='todos';
+        filtroStatus='todos';
+        filtroPeriodo=new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0');
+      }
+      paginaAtual=btn.dataset.page;
+      render();
+    });
   });
 }
 function bindGastos() {
