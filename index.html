@@ -1032,23 +1032,24 @@ function renderGastos() {
     <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
       <button onclick="gerarPDFGastos()" style="background:var(--green-light);color:var(--green);border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif">📄 Gerar PDF</button>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
       <div>
         <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px">Período</div>
-        <select class="form-input" id="filtro-periodo" style="padding:8px 10px;font-size:13px" onchange="aplicarFiltros()">
+        <select class="form-input" id="filtro-periodo" style="padding:8px 10px;font-size:13px">
           <option value="todos" ${filtroPeriodo==='todos'?'selected':''}>Todos os meses</option>
           ${periodoOpts}
         </select>
       </div>
       <div>
         <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px">Status</div>
-        <select class="form-input" id="filtro-status" style="padding:8px 10px;font-size:13px" onchange="aplicarFiltros()">
+        <select class="form-input" id="filtro-status" style="padding:8px 10px;font-size:13px">
           <option value="todos" ${filtroStatus==='todos'?'selected':''}>Todos</option>
           <option value="pago" ${filtroStatus==='pago'?'selected':''}>✅ Pagos</option>
           <option value="pendente" ${filtroStatus==='pendente'?'selected':''}>⏳ Pendentes</option>
         </select>
       </div>
     </div>
+    <button onclick="aplicarFiltros()" style="width:100%;background:var(--green);color:#fff;border:none;border-radius:8px;padding:10px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;cursor:pointer;margin-bottom:10px">🔍 Pesquisar</button>
     <div class="filtros">
       <button class="filtro-btn ${filtroCategoria==='todos'?'active':''}" data-filtro="todos">Todas</button>
       ${CATEGORIAS.map(c=>'<button class="filtro-btn '+(filtroCategoria===c.id?'active':'')+'" data-filtro="'+c.id+'">'+c.icon+' '+c.label+'</button>').join('')}
@@ -2807,6 +2808,7 @@ window.abrirHistoricoLancamentos = function(limite=10, hFiltroStatus='todos', hF
         </select>
       </div>
     </div>
+    <button onclick="aplicarFiltroHistorico()" style="width:100%;background:var(--green);color:#fff;border:none;border-radius:8px;padding:10px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;cursor:pointer;margin-bottom:8px">🔍 Pesquisar</button>
     <div class="filtros" style="margin-bottom:8px">
       <button class="filtro-btn ${hFiltroCat==='todos'?'active':''}" onclick="aplicarFiltroHistorico()">Todas</button>
       ${CATEGORIAS.map(c=>{const ativo=hFiltroCat===c.id?'active':'';return '<button class="filtro-btn '+ativo+'" onclick="aplicarFiltroHistorico(\''+c.id+'\')">'+c.icon+' '+c.label+'</button>';}).join('')}
