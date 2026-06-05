@@ -2490,21 +2490,40 @@ window.marcarContaPaga = function(gastoId, parcelaNum, tipo) {
   });
 };
 
-window.abrirGastosMes = function() {
+window.abrirGastosMes = function(mes, ano) {
   const overlay = document.getElementById('modal-overlay');
   const mc = document.getElementById('modal-content');
-  const mesAtual = new Date().getMonth();
-  const anoAtual = new Date().getFullYear();
-  const nomeMes = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'][mesAtual];
+  const hoje = new Date();
+  const mesAlvo = mes !== undefined ? mes : hoje.getMonth();
+  const anoAlvo = ano !== undefined ? ano : hoje.getFullYear();
+  const MESES_NOMES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const nomeMes = MESES_NOMES[mesAlvo];
+  const ehMesAtual = mesAlvo===hoje.getMonth() && anoAlvo===hoje.getFullYear();
+
   const lista = [...gastos].filter(g=>{
     const d = new Date(g.data+'T00:00:00');
-    return d.getMonth()===mesAtual && d.getFullYear()===anoAtual;
+    return d.getMonth()===mesAlvo && d.getFullYear()===anoAlvo;
   }).sort((a,b)=>new Date(a.data)-new Date(b.data));
   const total = lista.reduce((s,g)=>s+(g.valor||0),0);
   const totalPago = lista.filter(g=>g.status==='pago').reduce((s,g)=>s+(g.valor||0),0);
   const totalPend = lista.filter(g=>g.status==='pendente').reduce((s,g)=>s+(g.valor||0),0);
 
-  const linhas = lista.length===0
+  // Build historico - all months with gastos except current
+  const mapa = {};
+  gastos.forEach(g=>{
+    if(!g.data) return;
+    const d = new Date(g.data+'T00:00:00');
+    const key = d.getFullYear()+'-'+d.getMonth();
+    if(!mapa[key]) mapa[key]={mes:d.getMonth(),ano:d.getFullYear(),total:0,pago:0,qtd:0};
+    mapa[key].total += g.valor||0;
+    if(g.status==='pago') mapa[key].pago += g.valor||0;
+    mapa[key].qtd++;
+  });
+  const historico = Object.values(mapa)
+    .filter(h=>!(h.mes===hoje.getMonth()&&h.ano===hoje.getFullYear()))
+    .sort((a,b)=>b.ano-a.ano||b.mes-a.mes);
+
+  const linhasGastos = lista.length===0
     ? '<div class="empty"><div class="empty-icon">📅</div><p>Nenhum gasto em '+nomeMes+'</p></div>'
     : lista.map(g=>{
         const cat = getCat(g.categoria);
@@ -2523,9 +2542,24 @@ window.abrirGastosMes = function() {
         +'</div>';
       }).join('');
 
+  const linhasHistorico = historico.length===0
+    ? '<div style="font-size:13px;color:var(--text-muted);padding:8px 0">Nenhum histórico anterior</div>'
+    : historico.map(h=>'<div class="gasto-item" style="cursor:pointer" onclick="abrirGastosMes('+h.mes+','+h.ano+')">'
+        +'<div class="gasto-icon" style="background:#e8f5f0">📅</div>'
+        +'<div class="gasto-info">'
+          +'<div class="gi-cat">'+MESES_NOMES[h.mes]+' '+h.ano+'</div>'
+          +'<div class="gi-desc">'+h.qtd+' lançamento'+(h.qtd!==1?'s':'')+'</div>'
+        +'</div>'
+        +'<div class="gasto-valor">'
+          +'<div class="gv-val" style="color:var(--red)">'+fmtR(h.total)+'</div>'
+          +'<div class="gv-status" style="font-size:10px;color:var(--text-hint)">ver detalhes ›</div>'
+        +'</div>'
+      +'</div>').join('');
+
   mc.innerHTML = `
     <div class="modal-handle"></div>
-    <div class="modal-title">Gastos em ${nomeMes}</div>
+    <div class="modal-title">${ehMesAtual?'Gasto em '+nomeMes:nomeMes+' '+anoAlvo}</div>
+    ${!ehMesAtual?'<button class="btn-secondary" onclick="abrirGastosMes()" style="margin-bottom:12px;padding:8px">‹ Voltar para o mês atual</button>':''}
     <div class="card" style="margin-bottom:12px;padding:12px 16px">
       <div style="display:flex;justify-content:space-between;margin-bottom:6px">
         <span style="font-size:13px;color:var(--text-muted)">Total do mês</span>
@@ -2540,7 +2574,11 @@ window.abrirGastosMes = function() {
         <span style="font-size:13px;font-weight:500;color:var(--amber)">${fmtR(totalPend)}</span>
       </div>
     </div>
-    <div class="modal-scroll-list">${linhas}</div>
+    <div class="section-title">Lançamentos do mês</div>
+    <div class="modal-scroll-list">
+      ${linhasGastos}
+      ${ehMesAtual && historico.length>0 ? '<div class="section-title" style="margin-top:16px">Histórico de meses anteriores</div>'+linhasHistorico : ''}
+    </div>
     <div class="modal-footer"><button class="btn-fechar" onclick="fecharModal()">✕ Fechar</button></div>
   `;
   overlay.classList.add('open');
