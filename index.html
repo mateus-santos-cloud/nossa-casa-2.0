@@ -270,6 +270,8 @@ let filtroCategoria = 'todos';
 let filtroStatus = 'todos';
 const _mesAtualKey = new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0');
 let filtroPeriodo = _mesAtualKey;
+let filtroBusca = '';
+let filtroOrdem = 'data_desc';
 let unsubGastos = null;
 let unsubEtapas = null;
 let editandoGasto = null;
@@ -1016,7 +1018,24 @@ function renderGastos() {
       return d.getFullYear()===ano && d.getMonth()===(mes-1);
     });
   }
-  const ordenados = filtrados.sort((a,b)=>new Date(b.data)-new Date(a.data));
+  if(filtroBusca.trim()) {
+    const busca = filtroBusca.trim().toLowerCase();
+    filtrados = filtrados.filter(g=>
+      (g.descricao||'').toLowerCase().includes(busca) ||
+      getCat(g.categoria).label.toLowerCase().includes(busca) ||
+      (g.profissional||'').toLowerCase().includes(busca)
+    );
+  }
+  // Ordenação
+  if(filtroOrdem==='data_desc') filtrados.sort((a,b)=>new Date(b.data)-new Date(a.data));
+  else if(filtroOrdem==='data_asc') filtrados.sort((a,b)=>new Date(a.data)-new Date(b.data));
+  else if(filtroOrdem==='valor_desc') filtrados.sort((a,b)=>(b.valor||0)-(a.valor||0));
+  else if(filtroOrdem==='valor_asc') filtrados.sort((a,b)=>(a.valor||0)-(b.valor||0));
+
+  const totalFiltrado = filtrados.reduce((s,g)=>s+(g.valor||0),0);
+  const totalPago = filtrados.filter(g=>g.status==='pago').reduce((s,g)=>s+(g.valor||0),0);
+  const totalPend = filtrados.filter(g=>g.status==='pendente').reduce((s,g)=>s+(g.valor||0),0);
+
   const periodos = {};
   gastos.forEach(g=>{
     if(!g.data) return;
@@ -1027,12 +1046,40 @@ function renderGastos() {
   const periodoOpts = Object.entries(periodos).sort((a,b)=>b[0].localeCompare(a[0])).map(([val,label])=>
     '<option value="'+val+'" '+(filtroPeriodo===val?'selected':'')+'>'+label+'</option>'
   ).join('');
-  const totalFiltrado = ordenados.reduce((s,g)=>s+(g.valor||0),0);
-  const temFiltro = filtroCategoria!=='todos'||filtroStatus!=='todos'||filtroPeriodo!=='todos';
+
+  const temFiltro = filtroCategoria!=='todos'||filtroStatus!=='todos'||filtroPeriodo!==_mesAtualKey||filtroBusca.trim()||filtroOrdem!=='data_desc';
+
   return `
     <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
       <button onclick="gerarPDFGastos()" style="background:var(--green-light);color:var(--green);border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif">📄 Gerar PDF</button>
     </div>
+
+    <!-- RESUMO DO PERÍODO -->
+    <div class="card" style="margin-bottom:10px;padding:12px 16px">
+      <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px">📊 Resumo do período</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+        <div style="text-align:center">
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px">Total</div>
+          <div style="font-size:14px;font-weight:700;color:var(--text)">${fmtR(totalFiltrado)}</div>
+        </div>
+        <div style="text-align:center;border-left:1px solid var(--border);border-right:1px solid var(--border)">
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px">Pago</div>
+          <div style="font-size:14px;font-weight:700;color:var(--green-mid)">${fmtR(totalPago)}</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px">Pendente</div>
+          <div style="font-size:14px;font-weight:700;color:var(--amber)">${fmtR(totalPend)}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BUSCA -->
+    <div style="position:relative;margin-bottom:8px">
+      <input class="form-input" id="filtro-busca" type="text" placeholder="🔍 Buscar por descrição, categoria..." value="${filtroBusca}" style="padding-right:80px">
+      <button onclick="aplicarBusca()" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:var(--green);color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif">Buscar</button>
+    </div>
+
+    <!-- FILTROS -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
       <div>
         <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px">Período</div>
@@ -1050,17 +1097,29 @@ function renderGastos() {
         </select>
       </div>
     </div>
+    <div style="margin-bottom:8px">
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px">Ordenar por</div>
+      <select class="form-input" id="filtro-ordem" style="padding:8px 10px;font-size:13px">
+        <option value="data_desc" ${filtroOrdem==='data_desc'?'selected':''}>📅 Data — mais recente</option>
+        <option value="data_asc" ${filtroOrdem==='data_asc'?'selected':''}>📅 Data — mais antigo</option>
+        <option value="valor_desc" ${filtroOrdem==='valor_desc'?'selected':''}>💰 Valor — maior primeiro</option>
+        <option value="valor_asc" ${filtroOrdem==='valor_asc'?'selected':''}>💰 Valor — menor primeiro</option>
+      </select>
+    </div>
     <button onclick="aplicarFiltros()" style="width:100%;background:var(--green);color:#fff;border:none;border-radius:8px;padding:10px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;cursor:pointer;margin-bottom:10px">🔍 Pesquisar</button>
+
     <div class="filtros">
       <button class="filtro-btn ${filtroCategoria==='todos'?'active':''}" data-filtro="todos">Todas</button>
       ${CATEGORIAS.map(c=>'<button class="filtro-btn '+(filtroCategoria===c.id?'active':'')+'" data-filtro="'+c.id+'">'+c.icon+' '+c.label+'</button>').join('')}
     </div>
+
     ${temFiltro?`<div style="display:flex;justify-content:space-between;align-items:center;background:var(--green-light);border-radius:8px;padding:8px 12px;margin-bottom:10px">
-      <div style="font-size:12px;color:var(--green-mid)">${ordenados.length} resultado${ordenados.length!==1?'s':''} · ${fmtR(totalFiltrado)}</div>
+      <div style="font-size:12px;color:var(--green-mid)">${filtrados.length} resultado${filtrados.length!==1?'s':''}</div>
       <button onclick="limparFiltros()" style="font-size:11px;color:var(--green);background:none;border:none;cursor:pointer;font-weight:500;font-family:'DM Sans',sans-serif">✕ Limpar</button>
     </div>`:''}
+
     <div class="card">
-      ${ordenados.length===0?'<div class="empty"><div class="empty-icon">🔍</div><p>Nenhum gasto encontrado</p></div>':ordenados.map(g=>renderGastoItem(g,true)).join('')}
+      ${filtrados.length===0?'<div class="empty"><div class="empty-icon">🔍</div><p>Nenhum gasto encontrado</p></div>':filtrados.map(g=>renderGastoItem(g,true)).join('')}
     </div>
   `;
 }
@@ -2977,10 +3036,11 @@ function bindNav() {
   document.querySelectorAll('.nav-item').forEach(btn=>{
     btn.addEventListener('click',()=>{
       if(btn.dataset.page==='gastos' && paginaAtual!=='gastos') {
-        // Reset to current month when entering gastos tab
         filtroCategoria='todos';
         filtroStatus='todos';
         filtroPeriodo=new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0');
+        filtroBusca='';
+        filtroOrdem='data_desc';
       }
       paginaAtual=btn.dataset.page;
       render();
@@ -2991,20 +3051,33 @@ function bindGastos() {
   document.querySelectorAll('.filtro-btn').forEach(btn=>{
     btn.addEventListener('click',()=>{ filtroCategoria=btn.dataset.filtro; render(); });
   });
+  document.getElementById('filtro-busca')?.addEventListener('keydown', e=>{
+    if(e.key==='Enter') { filtroBusca=e.target.value||''; render(); }
+  });
 }
 
 window.aplicarFiltros = function() {
   const periodo = document.getElementById('filtro-periodo')?.value;
   const status = document.getElementById('filtro-status')?.value;
+  const ordem = document.getElementById('filtro-ordem')?.value;
   if(periodo !== undefined) filtroPeriodo = periodo;
   if(status !== undefined) filtroStatus = status;
+  if(ordem !== undefined) filtroOrdem = ordem;
+  render();
+};
+
+window.aplicarBusca = function() {
+  const busca = document.getElementById('filtro-busca')?.value||'';
+  filtroBusca = busca;
   render();
 };
 
 window.limparFiltros = function() {
   filtroCategoria = 'todos';
   filtroStatus = 'todos';
-  filtroPeriodo = 'todos';
+  filtroPeriodo = _mesAtualKey;
+  filtroBusca = '';
+  filtroOrdem = 'data_desc';
   render();
 };
 function bindEtapas() {}
