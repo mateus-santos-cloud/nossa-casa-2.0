@@ -267,6 +267,8 @@ let paginaAtual = 'dashboard';
 let mesRelatorio = new Date().getMonth();
 let anoRelatorio = new Date().getFullYear();
 let filtroCategoria = 'todos';
+let filtroStatus = 'todos';
+let filtroPeriodo = 'todos';
 let unsubGastos = null;
 let unsubEtapas = null;
 let editandoGasto = null;
@@ -1003,18 +1005,60 @@ function renderGastoItem(g, showActions=true) {
 
 // ===================== GASTOS =====================
 function renderGastos() {
-  const filtrados = filtroCategoria === 'todos' ? gastos : gastos.filter(g=>g.categoria===filtroCategoria);
-  const ordenados = [...filtrados].sort((a,b)=>new Date(b.data)-new Date(a.data));
+  let filtrados = [...gastos];
+  if(filtroCategoria !== 'todos') filtrados = filtrados.filter(g=>g.categoria===filtroCategoria);
+  if(filtroStatus !== 'todos') filtrados = filtrados.filter(g=>g.status===filtroStatus);
+  if(filtroPeriodo !== 'todos') {
+    const [ano, mes] = filtroPeriodo.split('-').map(Number);
+    filtrados = filtrados.filter(g=>{
+      const d = new Date(g.data+'T00:00:00');
+      return d.getFullYear()===ano && d.getMonth()===(mes-1);
+    });
+  }
+  const ordenados = filtrados.sort((a,b)=>new Date(b.data)-new Date(a.data));
+  const periodos = {};
+  gastos.forEach(g=>{
+    if(!g.data) return;
+    const d = new Date(g.data+'T00:00:00');
+    const key = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    periodos[key] = MESES[d.getMonth()]+' '+d.getFullYear();
+  });
+  const periodoOpts = Object.entries(periodos).sort((a,b)=>b[0].localeCompare(a[0])).map(([val,label])=>
+    '<option value="'+val+'" '+(filtroPeriodo===val?'selected':'')+'>'+label+'</option>'
+  ).join('');
+  const totalFiltrado = ordenados.reduce((s,g)=>s+(g.valor||0),0);
+  const temFiltro = filtroCategoria!=='todos'||filtroStatus!=='todos'||filtroPeriodo!=='todos';
   return `
     <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
       <button onclick="gerarPDFGastos()" style="background:var(--green-light);color:var(--green);border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif">📄 Gerar PDF</button>
     </div>
-    <div class="filtros">
-      <button class="filtro-btn ${filtroCategoria==='todos'?'active':''}" data-filtro="todos">Todos</button>
-      ${CATEGORIAS.map(c=>`<button class="filtro-btn ${filtroCategoria===c.id?'active':''}" data-filtro="${c.id}">${c.icon} ${c.label}</button>`).join('')}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+      <div>
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px">Período</div>
+        <select class="form-input" id="filtro-periodo" style="padding:8px 10px;font-size:13px" onchange="aplicarFiltros()">
+          <option value="todos" ${filtroPeriodo==='todos'?'selected':''}>Todos os meses</option>
+          ${periodoOpts}
+        </select>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px">Status</div>
+        <select class="form-input" id="filtro-status" style="padding:8px 10px;font-size:13px" onchange="aplicarFiltros()">
+          <option value="todos" ${filtroStatus==='todos'?'selected':''}>Todos</option>
+          <option value="pago" ${filtroStatus==='pago'?'selected':''}>✅ Pagos</option>
+          <option value="pendente" ${filtroStatus==='pendente'?'selected':''}>⏳ Pendentes</option>
+        </select>
+      </div>
     </div>
+    <div class="filtros">
+      <button class="filtro-btn ${filtroCategoria==='todos'?'active':''}" data-filtro="todos">Todas</button>
+      ${CATEGORIAS.map(c=>'<button class="filtro-btn '+(filtroCategoria===c.id?'active':'')+'" data-filtro="'+c.id+'">'+c.icon+' '+c.label+'</button>').join('')}
+    </div>
+    ${temFiltro?`<div style="display:flex;justify-content:space-between;align-items:center;background:var(--green-light);border-radius:8px;padding:8px 12px;margin-bottom:10px">
+      <div style="font-size:12px;color:var(--green-mid)">${ordenados.length} resultado${ordenados.length!==1?'s':''} · ${fmtR(totalFiltrado)}</div>
+      <button onclick="limparFiltros()" style="font-size:11px;color:var(--green);background:none;border:none;cursor:pointer;font-weight:500;font-family:'DM Sans',sans-serif">✕ Limpar</button>
+    </div>`:''}
     <div class="card">
-      ${ordenados.length===0?`<div class="empty"><div class="empty-icon">🔍</div><p>Nenhum gasto encontrado</p></div>`:ordenados.map(g=>renderGastoItem(g,true)).join('')}
+      ${ordenados.length===0?'<div class="empty"><div class="empty-icon">🔍</div><p>Nenhum gasto encontrado</p></div>':ordenados.map(g=>renderGastoItem(g,true)).join('')}
     </div>
   `;
 }
@@ -2884,6 +2928,21 @@ function bindGastos() {
     btn.addEventListener('click',()=>{ filtroCategoria=btn.dataset.filtro; render(); });
   });
 }
+
+window.aplicarFiltros = function() {
+  const periodo = document.getElementById('filtro-periodo')?.value;
+  const status = document.getElementById('filtro-status')?.value;
+  if(periodo !== undefined) filtroPeriodo = periodo;
+  if(status !== undefined) filtroStatus = status;
+  render();
+};
+
+window.limparFiltros = function() {
+  filtroCategoria = 'todos';
+  filtroStatus = 'todos';
+  filtroPeriodo = 'todos';
+  render();
+};
 function bindEtapas() {}
 function bindRelatorios() {
   document.getElementById('btn-mes-prev')?.addEventListener('click',()=>{
