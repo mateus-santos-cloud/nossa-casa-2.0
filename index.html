@@ -1050,10 +1050,6 @@ function renderGastos() {
   const temFiltro = filtroCategoria!=='todos'||filtroStatus!=='todos'||filtroPeriodo!==_mesAtualKey||filtroBusca.trim()||filtroOrdem!=='data_desc';
 
   return `
-    <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
-      <button onclick="gerarPDFGastos()" style="background:var(--green-light);color:var(--green);border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif">📄 Gerar PDF</button>
-    </div>
-
     <!-- RESUMO DO PERÍODO -->
     <div class="card" style="margin-bottom:10px;padding:12px 16px">
       <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px">📊 Resumo do período</div>
@@ -1106,17 +1102,18 @@ function renderGastos() {
         <option value="valor_asc" ${filtroOrdem==='valor_asc'?'selected':''}>💰 Valor — menor primeiro</option>
       </select>
     </div>
-    <button onclick="aplicarFiltros()" style="width:100%;background:var(--green);color:#fff;border:none;border-radius:8px;padding:10px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;cursor:pointer;margin-bottom:10px">🔍 Pesquisar</button>
+    <div style="display:grid;grid-template-columns:1fr auto auto;gap:8px;margin-bottom:10px">
+      <button onclick="aplicarFiltros()" style="background:var(--green);color:#fff;border:none;border-radius:8px;padding:10px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;cursor:pointer">🔍 Pesquisar</button>
+      <button onclick="limparFiltros()" style="background:var(--border);color:var(--text-muted);border:none;border-radius:8px;padding:10px 14px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap">✕ Limpar</button>
+      <button onclick="gerarPDFGastosFiltrado()" style="background:var(--green-light);color:var(--green);border:none;border-radius:8px;padding:10px 14px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap">📄 PDF</button>
+    </div>
 
     <div class="filtros">
       <button class="filtro-btn ${filtroCategoria==='todos'?'active':''}" data-filtro="todos">Todas</button>
       ${CATEGORIAS.map(c=>'<button class="filtro-btn '+(filtroCategoria===c.id?'active':'')+'" data-filtro="'+c.id+'">'+c.icon+' '+c.label+'</button>').join('')}
     </div>
 
-    ${temFiltro?`<div style="display:flex;justify-content:space-between;align-items:center;background:var(--green-light);border-radius:8px;padding:8px 12px;margin-bottom:10px">
-      <div style="font-size:12px;color:var(--green-mid)">${filtrados.length} resultado${filtrados.length!==1?'s':''}</div>
-      <button onclick="limparFiltros()" style="font-size:11px;color:var(--green);background:none;border:none;cursor:pointer;font-weight:500;font-family:'DM Sans',sans-serif">✕ Limpar</button>
-    </div>`:''}
+    ${filtrados.length !== gastos.length?`<div style="background:var(--green-light);border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:12px;color:var(--green-mid)">${filtrados.length} resultado${filtrados.length!==1?'s':''} encontrado${filtrados.length!==1?'s':''}</div>`:''}
 
     <div class="card">
       ${filtrados.length===0?'<div class="empty"><div class="empty-icon">🔍</div><p>Nenhum gasto encontrado</p></div>':filtrados.map(g=>renderGastoItem(g,true)).join('')}
@@ -3019,6 +3016,72 @@ window.gerarPDFProgressoObra = function() {
     +rows;
 
   gerarPDF('Progresso da Obra', body);
+};
+
+window.gerarPDFGastosFiltrado = function() {
+  let filtrados = [...gastos];
+  if(filtroCategoria !== 'todos') filtrados = filtrados.filter(g=>g.categoria===filtroCategoria);
+  if(filtroStatus !== 'todos') filtrados = filtrados.filter(g=>g.status===filtroStatus);
+  if(filtroPeriodo !== 'todos') {
+    const [ano, mes] = filtroPeriodo.split('-').map(Number);
+    filtrados = filtrados.filter(g=>{
+      const d = new Date(g.data+'T00:00:00');
+      return d.getFullYear()===ano && d.getMonth()===(mes-1);
+    });
+  }
+  if(filtroBusca.trim()) {
+    const busca = filtroBusca.trim().toLowerCase();
+    filtrados = filtrados.filter(g=>
+      (g.descricao||'').toLowerCase().includes(busca)||
+      getCat(g.categoria).label.toLowerCase().includes(busca)||
+      (g.profissional||'').toLowerCase().includes(busca)
+    );
+  }
+  if(filtroOrdem==='data_desc') filtrados.sort((a,b)=>new Date(b.data)-new Date(a.data));
+  else if(filtroOrdem==='data_asc') filtrados.sort((a,b)=>new Date(a.data)-new Date(b.data));
+  else if(filtroOrdem==='valor_desc') filtrados.sort((a,b)=>(b.valor||0)-(a.valor||0));
+  else if(filtroOrdem==='valor_asc') filtrados.sort((a,b)=>(a.valor||0)-(b.valor||0));
+
+  const total = filtrados.reduce((s,g)=>s+(g.valor||0),0);
+  const totalPago = filtrados.filter(g=>g.status==='pago').reduce((s,g)=>s+(g.valor||0),0);
+  const totalPend = filtrados.filter(g=>g.status==='pendente').reduce((s,g)=>s+(g.valor||0),0);
+
+  // Titulo dinâmico
+  let titulo = 'Gastos';
+  if(filtroPeriodo !== 'todos') {
+    const [ano, mes] = filtroPeriodo.split('-').map(Number);
+    titulo = 'Gastos — '+MESES[mes-1]+' '+ano;
+  }
+  if(filtroCategoria !== 'todos') titulo += ' · '+getCat(filtroCategoria).label;
+  if(filtroStatus !== 'todos') titulo += ' · '+(filtroStatus==='pago'?'Pagos':'Pendentes');
+  if(filtroBusca.trim()) titulo += ' · "'+filtroBusca+'"';
+
+  const porCat = {}; filtrados.forEach(g=>{porCat[g.categoria]=(porCat[g.categoria]||0)+(g.valor||0);});
+  const catRows = Object.entries(porCat).sort((a,b)=>b[1]-a[1]).map(([cat,val])=>{
+    const c=getCat(cat); return '<tr><td>'+c.icon+' '+c.label+'</td><td>'+r$(val)+'</td><td>'+(total>0?Math.round(val/total*100):0)+'%</td></tr>';
+  }).join('');
+
+  const rows = filtrados.map((g,i)=>{
+    const cat=getCat(g.categoria); const pgto=PAGAMENTOS.find(p=>p.id===g.formaPagamento)?.label||'—';
+    return '<tr><td>'+(i+1)+'</td><td>'+fmtData(g.data)+'</td><td>'+cat.icon+' '+cat.label+'</td>'
+      +'<td>'+(g.descricao||'—')+(g.profissional?'<br><small style="color:#888">'+g.profissional+'</small>':'')+'</td>'
+      +'<td>'+pgto+(g.totalParcelas>1?' ('+g.totalParcelas+'x)':'')+'</td>'
+      +'<td><span class="tg '+(g.status==='pago'?'pago':'pendente')+'">'+(g.status==='pago'?'Pago':'Pendente')+'</span></td>'
+      +'<td style="font-weight:700">'+r$(g.valor||0)+'</td></tr>';
+  }).join('');
+
+  const body = '<div class="rg">'
+    +'<div class="rc"><div class="rl">Lançamentos</div><div class="rv">'+filtrados.length+'</div></div>'
+    +'<div class="rc green"><div class="rl">Total pago</div><div class="rv">'+r$(totalPago)+'</div></div>'
+    +'<div class="rc amber"><div class="rl">Total pendente</div><div class="rv">'+r$(totalPend)+'</div></div>'
+    +'<div class="rc red"><div class="rl">Total geral</div><div class="rv">'+r$(total)+'</div></div>'
+    +'</div>'
+    +(Object.keys(porCat).length>0?'<h2>Por categoria</h2><table><thead><tr><th>Categoria</th><th>Total</th><th>%</th></tr></thead><tbody>'+catRows+'</tbody></table>':'')
+    +'<h2>Lançamentos</h2>'
+    +(filtrados.length===0?'<p style="color:#999;padding:12px 0">Nenhum resultado encontrado.</p>'
+      :'<table><thead><tr><th>#</th><th>Data</th><th>Categoria</th><th>Descrição</th><th>Pagamento</th><th>Status</th><th>Valor</th></tr></thead><tbody>'+rows+'<tr class="tr"><td colspan="6">TOTAL</td><td>'+r$(total)+'</td></tr></tbody></table>');
+
+  gerarPDF(titulo, body);
 };
 
 window.fazerLogout = async function() {
