@@ -2528,166 +2528,85 @@ window.abrirMaoDeObraMes = function() {
   overlay.classList.add('open');
 };
 
-window.abrirHistoricoLancamentos = function(limite=10, hFiltroStatus='todos', hFiltroCat='todos', hFiltroPeriodo='todos') {
+window.abrirHistoricoLancamentos = function(limite, hFiltroStatus, hFiltroCat, hFiltroPeriodo) {
+  limite = limite || 10;
+  hFiltroStatus = hFiltroStatus || 'todos';
+  hFiltroCat = hFiltroCat || 'todos';
+  hFiltroPeriodo = hFiltroPeriodo || 'todos';
+
   const overlay = document.getElementById('modal-overlay');
   const mc = document.getElementById('modal-content');
 
-  // Apply filters
-  let gastosFiltrados = [...gastos];
-  if(hFiltroStatus !== 'todos') gastosFiltrados = gastosFiltrados.filter(g=>g.status===hFiltroStatus);
-  if(hFiltroCat !== 'todos') gastosFiltrados = gastosFiltrados.filter(g=>g.categoria===hFiltroCat);
+  let gf = [...gastos];
+  if(hFiltroStatus !== 'todos') gf = gf.filter(function(g){return g.status===hFiltroStatus;});
+  if(hFiltroCat !== 'todos') gf = gf.filter(function(g){return g.categoria===hFiltroCat;});
   if(hFiltroPeriodo !== 'todos') {
-    const [ano, mes] = hFiltroPeriodo.split('-').map(Number);
-    gastosFiltrados = gastosFiltrados.filter(g=>{
-      const d = new Date(g.data+'T00:00:00');
-      return d.getFullYear()===ano && d.getMonth()===(mes-1);
-    });
+    const pts = hFiltroPeriodo.split('-').map(Number);
+    gf = gf.filter(function(g){ const d=new Date(g.data+'T00:00:00'); return d.getFullYear()===pts[0]&&d.getMonth()===(pts[1]-1); });
   }
 
-  // Group by date
   const porData = {};
-  gastosFiltrados.forEach(g=>{
-    if(!g.data) return;
-    if(!porData[g.data]) porData[g.data] = [];
-    porData[g.data].push(g);
-  });
-
-  const datas = Object.keys(porData).sort((a,b)=>new Date(b)-new Date(a));
+  gf.forEach(function(g){ if(!g.data) return; if(!porData[g.data]) porData[g.data]=[]; porData[g.data].push(g); });
+  const datas = Object.keys(porData).sort(function(a,b){return new Date(b)-new Date(a);});
   const visiveis = datas.slice(0, limite);
   const temMais = datas.length > limite;
 
-  // Calc days since last entry (always from all gastos)
   const hoje = new Date(); hoje.setHours(0,0,0,0);
-  const todasDatas = Object.keys({}).constructor.fromEntries
-    ? Object.keys(gastos.reduce((acc,g)=>{if(g.data)acc[g.data]=1;return acc;},{})).sort((a,b)=>new Date(b)-new Date(a))
-    : [];
-  const ultimaDataGeral = gastos.length>0 ? gastos.map(g=>g.data).filter(Boolean).sort((a,b)=>new Date(b)-new Date(a))[0] : null;
-  const diasSem = ultimaDataGeral ? Math.floor((hoje-new Date(ultimaDataGeral+'T00:00:00'))/(1000*60*60*24)) : null;
+  const ultData = gastos.map(function(g){return g.data;}).filter(Boolean).sort(function(a,b){return new Date(b)-new Date(a);})[0];
+  const diasSem = ultData ? Math.floor((hoje-new Date(ultData+'T00:00:00'))/(1000*60*60*24)) : null;
+  const diasSemTxt = diasSem===null?'—':diasSem===0?'Hoje':'há '+diasSem+' dia'+(diasSem!==1?'s':'');
 
-  // Build period options
   const periodos = {};
-  gastos.forEach(g=>{
-    if(!g.data) return;
-    const d = new Date(g.data+'T00:00:00');
-    const key = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
-    periodos[key] = MESES[d.getMonth()]+' '+d.getFullYear();
-  });
-  const periodoOpts = Object.entries(periodos).sort((a,b)=>b[0].localeCompare(a[0]))
-    .map(([val,label])=>'<option value="'+val+'" '+(hFiltroPeriodo===val?'selected':'')+'>'+label+'</option>').join('');
+  gastos.forEach(function(g){ if(!g.data) return; const d=new Date(g.data+'T00:00:00'); const k=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); periodos[k]=MESES[d.getMonth()]+' '+d.getFullYear(); });
+  let pOpts = '<option value="todos">Todos</option>';
+  Object.entries(periodos).sort(function(a,b){return b[0].localeCompare(a[0]);}).forEach(function(e){ pOpts += '<option value="'+e[0]+'" '+(hFiltroPeriodo===e[0]?'selected':'')+'>'+e[1]+'</option>'; });
+
+  let catBtns = '<button class="filtro-btn '+(hFiltroCat==='todos'?'active':'')+'" onclick="window._hcat=null;window._aplicarH()">Todas</button>';
+  CATEGORIAS.forEach(function(c){ catBtns += '<button class="filtro-btn '+(hFiltroCat===c.id?'active':'')+'" onclick="window._hcat='+JSON.stringify(c.id)+';window._aplicarH()">'+c.icon+' '+c.label+'</button>'; });
+
+  let linhas = '';
+  if(visiveis.length===0) {
+    linhas = '<div class="empty"><div class="empty-icon">🔍</div><p>Nenhum lançamento encontrado</p></div>';
+  } else {
+    visiveis.forEach(function(data){
+      const gd = porData[data];
+      const tot = gd.reduce(function(s,g){return s+(g.valor||0);},0);
+      const df = new Date(data+'T00:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'});
+      let itens = '';
+      gd.forEach(function(g){ const cat=getCat(g.categoria); itens+='<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)"><div style="font-size:12px">'+cat.icon+' '+(g.descricao||cat.label)+'</div><div style="font-size:12px;font-weight:500;color:'+(g.status==='pago'?'var(--green-mid)':'var(--amber)')+'">'+fmtR(g.valor)+'</div></div>'; });
+      linhas += '<div style="margin-bottom:12px"><div style="font-size:11px;font-weight:600;color:var(--green);padding:6px 0;border-bottom:2px solid var(--green-light);margin-bottom:6px;display:flex;justify-content:space-between"><span>'+df+'</span><span style="color:var(--red)">'+fmtR(tot)+'</span></div>'+itens+'<div style="font-size:11px;color:var(--text-hint);text-align:right;margin-top:4px">'+gd.length+' lançamento'+(gd.length!==1?'s':'')+'</div></div>';
+    });
+    if(temMais) {
+      linhas += '<div onclick="window._hlimite='+(limite+10)+';window._aplicarH()" style="text-align:center;padding:10px;border:1px dashed var(--border);border-radius:8px;margin:8px 0;cursor:pointer;font-size:13px;color:var(--text-muted)">↓ Carregar mais 10 ('+(datas.length-limite)+' restantes)</div>';
+    }
+  }
+
+  window._hcat = hFiltroCat === 'todos' ? null : hFiltroCat;
+  window._hlimite = 10;
+  window._aplicarH = function() {
+    const p = document.getElementById('h-filtro-periodo')?.value || hFiltroPeriodo;
+    const s = document.getElementById('h-filtro-status')?.value || hFiltroStatus;
+    const c = window._hcat !== undefined && window._hcat !== null ? window._hcat : hFiltroCat;
+    abrirHistoricoLancamentos(window._hlimite||10, s, c, p);
+    window._hlimite = 10;
+  };
 
   const temFiltro = hFiltroStatus!=='todos'||hFiltroCat!=='todos'||hFiltroPeriodo!=='todos';
+  const filtroBar = temFiltro ? '<div style="display:flex;justify-content:space-between;align-items:center;background:var(--green-light);border-radius:8px;padding:8px 12px;margin-bottom:8px"><div style="font-size:12px;color:var(--green-mid)">'+datas.length+' dia'+(datas.length!==1?'s':'')+' · '+gf.length+' lançamento'+(gf.length!==1?'s':'')+'</div><button onclick="abrirHistoricoLancamentos()" style="font-size:11px;color:var(--green);background:none;border:none;cursor:pointer;font-weight:500">✕ Limpar</button></div>' : '';
 
-  const linhas = visiveis.length===0
-    ? '<div class="empty"><div class="empty-icon">🔍</div><p>Nenhum lançamento encontrado</p></div>'
-    : visiveis.map(data=>{
-        const gastosDia = porData[data];
-        const totalDia = gastosDia.reduce((s,g)=>s+(g.valor||0),0);
-        const dataFmt = new Date(data+'T00:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'});
-        const itens = gastosDia.map(g=>{
-          const cat = getCat(g.categoria);
-          return '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--border)">'
-            +'<div style="font-size:12px">'+cat.icon+' '+(g.descricao||cat.label)+'</div>'
-            +'<div style="font-size:12px;font-weight:500;color:'+(g.status==='pago'?'var(--green-mid)':'var(--amber)')+'">'+fmtR(g.valor)+'</div>'
-            +'</div>';
-        }).join('');
-        return '<div style="margin-bottom:12px">'
-          +'<div style="font-size:11px;font-weight:600;color:var(--green);text-transform:capitalize;padding:6px 0;border-bottom:2px solid var(--green-light);margin-bottom:6px;display:flex;justify-content:space-between">'
-            +'<span>'+dataFmt+'</span><span style="color:var(--red)">'+fmtR(totalDia)+'</span>'
-          +'</div>'
-          +itens
-          +'<div style="font-size:11px;color:var(--text-hint);text-align:right;margin-top:4px">'+gastosDia.length+' lançamento'+(gastosDia.length!==1?'s':'')+'</div>'
-        +'</div>';
-      }).join('');
+  mc.innerHTML = '<div class="modal-handle"></div>'
+    +'<div class="modal-title">Histórico de lançamentos</div>'
+    +'<div class="card" style="margin-bottom:12px;padding:12px 16px"><div style="display:flex;justify-content:space-between"><span style="font-size:13px;color:var(--text-muted)">Último lançamento</span><span style="font-size:13px;font-weight:500;color:'+(diasSem>=3?'var(--amber)':'var(--green-mid)')+'">'+diasSemTxt+'</span></div></div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px"><div><div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;text-transform:uppercase">Período</div><select class="form-input" id="h-filtro-periodo" style="padding:8px 10px;font-size:13px">'+pOpts+'</select></div><div><div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;text-transform:uppercase">Status</div><select class="form-input" id="h-filtro-status" style="padding:8px 10px;font-size:13px"><option value="todos" '+(hFiltroStatus==='todos'?'selected':'')+'>Todos</option><option value="pago" '+(hFiltroStatus==='pago'?'selected':'')+'>✅ Pagos</option><option value="pendente" '+(hFiltroStatus==='pendente'?'selected':'')+'>⏳ Pendentes</option></select></div></div>'
+    +'<div class="filtros" style="margin-bottom:8px">'+catBtns+'</div>'
+    +'<button onclick="window._hlimite=10;window._aplicarH()" style="width:100%;background:var(--green);color:#fff;border:none;border-radius:8px;padding:10px;font-family:DM Sans,sans-serif;font-size:14px;font-weight:500;cursor:pointer;margin-bottom:8px">🔍 Pesquisar</button>'
+    +filtroBar
+    +'<div class="modal-scroll-list">'+linhas+'</div>'
+    +'<div class="modal-footer"><button class="btn-fechar" onclick="fecharModal()">✕ Fechar</button></div>';
 
-  mc.innerHTML = `
-    <div class="modal-handle"></div>
-    <div class="modal-title">Histórico de lançamentos</div>
-    <div class="card" style="margin-bottom:12px;padding:12px 16px">
-      <div style="display:flex;justify-content:space-between;margin-bottom:4px">
-        <span style="font-size:13px;color:var(--text-muted)">Último lançamento</span>
-        <span style="font-size:13px;font-weight:500;color:${diasSem>=3?'var(--amber)':'var(--green-mid)'}">
-          ${diasSem===null?'—':diasSem===0?'Hoje':'há '+diasSem+' dia'+(diasSem!==1?'s':'')}
-        </span>
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-      <div>
-        <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px">Período</div>
-        <select class="form-input" id="h-filtro-periodo" style="padding:8px 10px;font-size:13px">
-          <option value="todos" ${hFiltroPeriodo==='todos'?'selected':''}>Todos</option>
-          ${periodoOpts}
-        </select>
-      </div>
-      <div>
-        <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px">Status</div>
-        <select class="form-input" id="h-filtro-status" style="padding:8px 10px;font-size:13px">
-          <option value="todos" ${hFiltroStatus==='todos'?'selected':''}>Todos</option>
-          <option value="pago" ${hFiltroStatus==='pago'?'selected':''}>✅ Pagos</option>
-          <option value="pendente" ${hFiltroStatus==='pendente'?'selected':''}>⏳ Pendentes</option>
-        </select>
-      </div>
-    </div>
-    <button onclick="aplicarFiltroHistorico()" style="width:100%;background:var(--green);color:#fff;border:none;border-radius:8px;padding:10px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;cursor:pointer;margin-bottom:8px">🔍 Pesquisar</button>
-    <div class="filtros" style="margin-bottom:8px">
-      <button class="filtro-btn ${hFiltroCat==='todos'?'active':''}" onclick="aplicarFiltroHistorico()">Todas</button>
-      ${CATEGORIAS.map(c=>{const ativo=hFiltroCat===c.id?'active':'';return '<button class="filtro-btn '+ativo+'" onclick="aplicarFiltroHistorico(\''+c.id+'\')">'+c.icon+' '+c.label+'</button>';}).join('')}
-    </div>
-    ${(()=>{if(!temFiltro)return '';return '<div style="display:flex;justify-content:space-between;align-items:center;background:var(--green-light);border-radius:8px;padding:8px 12px;margin-bottom:8px"><div style="font-size:12px;color:var(--green-mid)">'+datas.length+' dia'+(datas.length!==1?'s':'')+' encontrado'+(datas.length!==1?'s':'')+' · '+gastosFiltrados.length+' lancamento'+(gastosFiltrados.length!==1?'s':'')+'</div><button onclick="abrirHistoricoLancamentos()" style="font-size:11px;color:var(--green);background:none;border:none;cursor:pointer;font-weight:500">x Limpar</button></div>';})()}
-    <div class="modal-scroll-list" id="historico-lista">
-      ${linhas}
-      ${temMais?'<button class="btn-fechar" style="width:100%;padding:10px;border:1px dashed var(--border);border-radius:8px;margin:8px 0" onclick="aplicarFiltroHistorico(undefined,'+(limite+10)+')">↓ Carregar mais 10 registros ('+(datas.length-limite)+' restantes)</button>':''}
-    </div>
-    <div class="modal-footer"><button class="btn-fechar" onclick="fecharModal()">✕ Fechar</button></div>
-  `;
   overlay.classList.add('open');
-
-  window.aplicarFiltroHistorico = function(cat, novoLimite) {
-    const periodo = document.getElementById('h-filtro-periodo')?.value || hFiltroPeriodo;
-    const status = document.getElementById('h-filtro-status')?.value || hFiltroStatus;
-    const categoria = cat !== undefined ? cat : (document.querySelector('.filtros .filtro-btn.active')?.textContent?.trim() !== 'Todas' ? hFiltroCat : 'todos');
-    const catFinal = cat !== undefined ? cat : hFiltroCat;
-    abrirHistoricoLancamentos(novoLimite||10, status, catFinal, periodo);
-  };
 };
 
-window.editarTarefa = function(id, etapaNum) {
-  const t = tarefas.find(x=>x.id===id);
-  if(!t) return;
-  const overlay = document.getElementById('modal-overlay');
-  const mc = document.getElementById('modal-content');
-  mc.innerHTML = `
-    <div class="modal-handle"></div>
-    <div class="modal-title">Editar tarefa</div>
-    <div class="form-group">
-      <label class="form-label">Nome da tarefa</label>
-      <input class="form-input" id="edit-nome" type="text" value="${t.nome||''}">
-    </div>
-    <div class="form-group">
-      <label class="form-label">Data de início</label>
-      <input class="form-input" id="edit-inicio" type="date" value="${t.dataInicio||''}">
-    </div>
-    <div class="form-group">
-      <label class="form-label">Observação (opcional)</label>
-      <input class="form-input" id="edit-obs" type="text" value="${t.obs||''}">
-    </div>
-    <button class="btn-primary" id="btn-salvar-edit">Salvar alterações</button>
-    <button class="btn-secondary" onclick="fecharModal();setTimeout(()=>abrirTarefasEtapa(${etapaNum}),200)">Cancelar</button>
-  `;
-  overlay.classList.add('open');
-  document.getElementById('btn-salvar-edit').onclick = async () => {
-    const nome = document.getElementById('edit-nome').value.trim();
-    const inicio = document.getElementById('edit-inicio').value;
-    const obs = document.getElementById('edit-obs').value.trim();
-    if(!nome) { showToast('Digite o nome da tarefa'); return; }
-    if(!inicio) { showToast('Informe a data de início'); return; }
-    try {
-      await updateDoc(doc(db,'tarefas',id), {nome, dataInicio:inicio, obs});
-      showToast('Tarefa atualizada!');
-      fecharModal();
-      setTimeout(()=>abrirTarefasEtapa(etapaNum), 200);
-    } catch(e) { showToast('Erro ao salvar.'); console.error(e); }
-  };
-};
 
 window.gerarPDFEtapaTarefas = function(num) {
   const et = etapas.find(e=>e.numero===num);
