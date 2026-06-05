@@ -1123,19 +1123,52 @@ function renderGastos() {
 
 // ===================== ETAPAS =====================
 function renderEtapas() {
-  const totalLib = etapas.filter(e=>e.liberado).length;
+  const etapasLib = etapas.filter(e=>e.liberado).sort((a,b)=>a.numero-b.numero);
+  const totalBruto = etapasLib.reduce((s,e)=>s+(e.valorBruto||0),0);
+  const totalTaxas = etapasLib.reduce((s,e)=>s+(e.taxas||0),0);
+  const totalLiq = totalBruto - totalTaxas;
+  const totalPrevisto = etapas.filter(e=>!e.liberado&&e.valorPrevisto).reduce((s,e)=>s+(e.valorPrevisto||0),0);
   return `
-    <div class="stats-grid">
-      <div class="stat-card"><div class="sc-label">Etapas liberadas</div><div class="sc-val green">${totalLib} / 12</div></div>
-      <div class="stat-card"><div class="sc-label">Total liberado líq.</div><div class="sc-val green">${fmtR(etapas.filter(e=>e.liberado).reduce((s,e)=>s+(e.valorBruto||0)-(e.taxas||0),0))}</div></div>
+    <div class="card" style="margin-bottom:12px">
+      <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px">💰 Resumo financeiro</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+        <div style="background:var(--green-light);border-radius:8px;padding:10px">
+          <div style="font-size:11px;color:var(--green-mid);margin-bottom:2px">Total bruto liberado</div>
+          <div style="font-size:15px;font-weight:700;color:var(--green-mid)">${fmtR(totalBruto)}</div>
+        </div>
+        <div style="background:var(--red-light);border-radius:8px;padding:10px">
+          <div style="font-size:11px;color:var(--red);margin-bottom:2px">Total de taxas</div>
+          <div style="font-size:15px;font-weight:700;color:var(--red)">${fmtR(totalTaxas)}</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div style="background:#f7f5f0;border-radius:8px;padding:10px;border-left:3px solid var(--green-mid)">
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px">Total líquido</div>
+          <div style="font-size:15px;font-weight:700;color:var(--green-mid)">${fmtR(totalLiq)}</div>
+        </div>
+        <div style="background:#f7f5f0;border-radius:8px;padding:10px;border-left:3px solid var(--amber)">
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px">Previsão restante</div>
+          <div style="font-size:15px;font-weight:700;color:var(--amber)">${totalPrevisto>0?fmtR(totalPrevisto):'—'}</div>
+        </div>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:12px;padding:12px 16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span style="font-size:13px;font-weight:500">Etapas liberadas</span>
+        <span style="font-size:15px;font-weight:700;color:var(--green-mid)">${etapasLib.length} de 12</span>
+      </div>
+      <div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden">
+        <div style="height:100%;width:${Math.round(etapasLib.length/12*100)}%;background:var(--green-accent);border-radius:4px"></div>
+      </div>
     </div>
     <div style="display:flex;gap:8px;margin-bottom:12px">
       <button class="btn-primary" onclick="abrirModalEtapa()" style="flex:1;margin-bottom:0">+ Registrar liberação</button>
       <button onclick="gerarPDFEtapas()" style="background:var(--green-light);color:var(--green);border:none;border-radius:8px;padding:0 14px;font-size:12px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap">📄 PDF</button>
     </div>
     ${Array.from({length:12},(_,i)=>{
-      const et = etapas.find(e=>e.numero===(i+1)) || null;
-      return renderEtapaItem(i+1, et);
+      const num = i+1;
+      const et = etapas.find(e=>e.numero===num) || null;
+      return renderEtapaItem(num, et);
     }).join('')}
   `;
 }
@@ -1146,314 +1179,41 @@ function renderEtapaItem(num, et) {
   const taxas = et ? (et.taxas||0) : 0;
   const liq = bruto - taxas;
   const data = et && et.data ? new Date(et.data+'T00:00:00').toLocaleDateString('pt-BR') : '—';
-  return `<div class="etapa-item">
-    <div class="etapa-header">
-      <div class="etapa-name">Etapa ${num}</div>
-      <span class="etapa-badge ${liberado?'badge-liberado':'badge-pendente'}">${liberado?'✅ Liberado':'⏳ Pendente'}</span>
-    </div>
-    ${liberado?`
-    <div class="etapa-valores">
-      <div class="ev-item"><div class="ev-label">Bruto</div><div class="ev-val">${fmtR(bruto)}</div></div>
-      <div class="ev-item"><div class="ev-label">Taxas</div><div class="ev-val red">-${fmtR(taxas)}</div></div>
-      <div class="ev-item"><div class="ev-label">Líquido</div><div class="ev-val green">${fmtR(liq)}</div></div>
-    </div>
-    <div style="font-size:11px;color:var(--text-muted);margin-top:6px">Data: ${data}</div>
-    ${et.obs?`<div style="font-size:11px;color:var(--text-muted);margin-top:2px">${et.obs}</div>`:''}
-    <div class="gasto-actions">
-      <button class="btn-edit" onclick="abrirTarefasEtapa(${num})">📋 Tarefas</button>
-      <button class="btn-del" onclick="deletarEtapa('${et.id}')">🗑️ Excluir</button>
-    </div>
-    `:`<div style="font-size:12px;color:var(--text-hint);margin-top:2px">Aguardando liberação da Caixa</div>
-    <div class="gasto-actions"><button class="btn-edit" onclick="abrirTarefasEtapa(${num})">📋 Tarefas</button></div>`}
-  </div>`;
+  const criadoEm = et && et.criadoEm ? new Date(et.criadoEm).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
+  const quem = et ? (et.quem||'—') : '—';
+  const valorPrevisto = et ? (et.valorPrevisto||0) : 0;
+  const etId = et ? et.id : '';
+
+  if(liberado) {
+    return '<div class="etapa-item">'
+      +'<div class="etapa-header"><div class="etapa-name">Etapa '+num+'</div><span class="etapa-badge badge-liberado">✅ Liberado</span></div>'
+      +'<div class="etapa-valores">'
+        +'<div class="ev-item"><div class="ev-label">Bruto</div><div class="ev-val">'+fmtR(bruto)+'</div></div>'
+        +'<div class="ev-item"><div class="ev-label">Taxas</div><div class="ev-val red">-'+fmtR(taxas)+'</div></div>'
+        +'<div class="ev-item"><div class="ev-label">Líquido</div><div class="ev-val green">'+fmtR(liq)+'</div></div>'
+      +'</div>'
+      +'<div style="font-size:11px;color:var(--text-muted);margin-top:6px">📅 Liberação: '+data+'</div>'
+      +(et.obs?'<div style="font-size:11px;color:var(--text-muted);margin-top:2px">📝 '+et.obs+'</div>':'')
+      +'<div style="font-size:10px;color:var(--text-hint);margin-top:4px;padding-top:4px;border-top:1px solid var(--border)">Cadastrado: '+criadoEm+' · por: '+quem+'</div>'
+      +'<div class="gasto-actions">'
+        +'<button class="btn-edit" onclick="abrirTarefasEtapa('+num+')">📋 Tarefas</button>'
+        +(etId?'<button class="btn-del" data-eid="'+etId+'" onclick="deletarEtapaById(this)">🗑️ Excluir</button>':'')
+      +'</div>'
+    +'</div>';
+  } else {
+    return '<div class="etapa-item">'
+      +'<div class="etapa-header"><div class="etapa-name">Etapa '+num+'</div><span class="etapa-badge badge-pendente">⏳ Pendente</span></div>'
+      +'<div style="font-size:12px;color:var(--text-hint);margin-top:4px">Aguardando liberação da Caixa</div>'
+      +(valorPrevisto>0?'<div style="font-size:12px;color:var(--amber);margin-top:4px;font-weight:500">Previsão: '+fmtR(valorPrevisto)+'</div>':'')
+      +'<div class="gasto-actions">'
+        +'<button class="btn-edit" onclick="abrirTarefasEtapa('+num+')">📋 Tarefas</button>'
+        +'<button class="btn-edit" onclick="abrirModalPrevisaoEtapa('+num+')">💰 Previsão</button>'
+        +(etId?'<button class="btn-del" data-eid="'+etId+'" onclick="deletarEtapaById(this)">🗑️ Excluir</button>':'')
+      +'</div>'
+    +'</div>';
+  }
 }
 
-// ===================== DIÁRIAS PEDREIRO =====================
-function renderDiarias() {
-  const totalDias = diarias.length;
-  const totalHorasDec = diarias.reduce((s,d)=>s+(d.horas||0),0);
-  const totalHoras = decimalParaHoras(totalHorasDec);
-  const ordenadas = [...diarias].sort((a,b)=>new Date(b.data)-new Date(a.data));
-  return `
-    <div class="stats-grid">
-      <div class="stat-card"><div class="sc-label">Total de dias</div><div class="sc-val green">${totalDias}</div></div>
-      <div class="stat-card"><div class="sc-label">Total de horas</div><div class="sc-val green">${totalHoras}</div></div>
-    </div>
-    <button class="btn-primary" onclick="abrirModalDiaria()" style="margin-bottom:12px">+ Registrar dia trabalhado</button>
-    <button class="btn-secondary" onclick="gerarPDFPedreiro()" style="margin-bottom:12px">📄 Gerar relatório PDF</button>
-    <div class="card">
-      ${ordenadas.length===0
-        ? `<div class="empty"><div class="empty-icon">👷</div><p>Nenhum dia registrado ainda</p></div>`
-        : ordenadas.map(d=>`
-          <div class="gasto-item">
-            <div class="gasto-icon" style="background:#e8f5f0">👷</div>
-            <div class="gasto-info">
-              <div class="gi-cat">${new Date(d.data+'T00:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})}</div>
-              <div class="gi-desc">${d.horasFormatado||decimalParaHoras(d.horas)} trabalhadas${d.obs?' · '+d.obs:''}</div>
-              <div class="gi-data">Registrado por: ${d.quem||''}</div>
-              <div class="gasto-actions">
-                <button class="btn-del" onclick="deletarDiaria('${d.id}')">🗑️ Excluir</button>
-              </div>
-            </div>
-            <div class="gasto-valor">
-              <div class="gv-val green">${d.horasFormatado||decimalParaHoras(d.horas)}</div>
-            </div>
-          </div>`).join('')}
-    </div>
-  `;
-}
-
-window.abrirModalDiaria = function() {
-  const overlay = document.getElementById('modal-overlay');
-  const content = document.getElementById('modal-content');
-  content.innerHTML = `
-    <div class="modal-handle"></div>
-    <div class="modal-title">Registrar dia trabalhado</div>
-    <div class="form-group">
-      <label class="form-label">Data</label>
-      <input class="form-input" id="d-data" type="date" value="${new Date().toISOString().slice(0,10)}">
-    </div>
-    <div class="form-group">
-      <label class="form-label">Horas trabalhadas (ex: 8:00 ou 1:30)</label>
-      <input class="form-input" id="d-horas" type="text" inputmode="text" placeholder="Ex: 8:00 ou 7:30">
-    </div>
-    <div class="form-group">
-      <label class="form-label">Observação (opcional)</label>
-      <input class="form-input" id="d-obs" type="text" placeholder="Ex: Levantamento de parede">
-    </div>
-    <button class="btn-primary" id="btn-salvar-diaria">Salvar</button>
-    <button class="btn-secondary" onclick="fecharModal()">Cancelar</button>
-  `;
-  overlay.classList.add('open');
-  document.getElementById('btn-salvar-diaria').onclick = salvarDiaria;
-};
-
-async function salvarDiaria() {
-  const btn = document.getElementById('btn-salvar-diaria');
-  btn.innerHTML = '<span class="spinner"></span>';
-  btn.disabled = true;
-  const data = document.getElementById('d-data').value;
-  const horasRaw = document.getElementById('d-horas').value.trim();
-  const horas = horasParaDecimal(horasRaw);
-  const horasFormatado = decimalParaHoras(horas);
-  const obs = document.getElementById('d-obs').value.trim();
-  if(!data || !horas) { showToast('Preencha data e horas'); btn.innerHTML='Salvar';btn.disabled=false; return; }
-  try {
-    await addDoc(collection(db,'diarias'), {
-      data, horas, horasFormatado, obs,
-      quem: currentUser.displayName||currentUser.email.split('@')[0],
-      uid: currentUser.uid,
-      criadoEm: new Date().toISOString()
-    });
-    showToast('Dia registrado!');
-    fecharModal();
-  } catch(e) { showToast('Erro ao salvar.'); console.error(e); }
-  btn.innerHTML='Salvar';btn.disabled=false;
-}
-
-window.deletarDiaria = function(id) {
-  showConfirm({
-    titulo: 'Excluir registro',
-    mensagem: 'Deseja excluir este dia registrado?',
-    confirmLabel: 'Excluir',
-    danger: true,
-    onConfirm: async () => {
-      try { await deleteDoc(doc(db,'diarias',id)); showToast('Registro excluído!'); } catch(e){ showToast('Erro ao excluir.'); }
-    }
-  });
-};
-
-window.gerarPDFPedreiro = function() {
-  const ordenadas = [...diarias].sort((a,b)=>new Date(a.data)-new Date(b.data));
-  const totalDias = ordenadas.length;
-  const totalHoras = ordenadas.reduce((s,d)=>s+(d.horas||0),0);
-  const hoje = new Date().toLocaleDateString('pt-BR');
-
-  const linhas = ordenadas.map((d,i)=>`
-    <tr style="background:${i%2===0?'#f9f9f9':'#fff'}">
-      <td style="padding:8px 12px;border-bottom:1px solid #eee">${new Date(d.data+'T00:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})}</td>
-      <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:center;font-weight:500">${d.horasFormatado||decimalParaHoras(d.horas)}</td>
-      <td style="padding:8px 12px;border-bottom:1px solid #eee;color:#666">${d.obs||'—'}</td>
-    </tr>`).join('');
-
-  const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
-  <title>Relatório Pedreiro - Nossa Casa</title>
-  <style>
-    body{font-family:Arial,sans-serif;margin:0;padding:32px;color:#1a1a1a}
-    h1{color:#1a4a3a;font-size:24px;margin-bottom:4px}
-    .sub{color:#666;font-size:13px;margin-bottom:24px}
-    table{width:100%;border-collapse:collapse;margin-top:16px}
-    th{background:#1a4a3a;color:#fff;padding:10px 12px;text-align:left;font-size:13px}
-    .totais{margin-top:24px;background:#e8f5f0;border-radius:8px;padding:16px;display:flex;gap:32px}
-    .tot-item .tot-label{font-size:12px;color:#666}
-    .tot-item .tot-val{font-size:22px;font-weight:bold;color:#1a4a3a}
-    .rodape{margin-top:32px;font-size:11px;color:#999;text-align:center}
-  </style></head><body>
-  <h1>🏠 Nossa Casa — Relatório do Pedreiro</h1>
-  <div class="sub">Gerado em ${hoje}</div>
-  <table>
-    <thead><tr><th>Data</th><th style="text-align:center">Horas</th><th>Observação</th></tr></thead>
-    <tbody>${linhas}</tbody>
-  </table>
-  <div class="totais">
-    <div class="tot-item"><div class="tot-label">Total de dias</div><div class="tot-val">${totalDias}</div></div>
-    <div class="tot-item"><div class="tot-label">Total de horas</div><div class="tot-val">${totalHoras}h</div></div>
-  </div>
-  <div class="rodape">Relatório gerado pelo app Nossa Casa</div>
-  <script>window.onload=()=>{window.print()}<\/script>
-  </body></html>`;
-
-  const blob = new Blob([html], {type:'text/html'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'relatorio-pedreiro.html';
-  a.click();
-  URL.revokeObjectURL(url);
-  showToast('PDF gerado! Abra o arquivo e use Imprimir > Salvar como PDF');
-};
-
-// ===================== SERVENTES =====================
-function renderServentes() {
-  const totalDias = serventes.length;
-  const totalHorasDec = serventes.reduce((s,d)=>s+(d.horas||0),0);
-  const totalHoras = decimalParaHoras(totalHorasDec);
-  const ordenadas = [...serventes].sort((a,b)=>new Date(b.data)-new Date(a.data));
-  return `
-    <div class="stats-grid">
-      <div class="stat-card"><div class="sc-label">Total de dias</div><div class="sc-val green">${totalDias}</div></div>
-      <div class="stat-card"><div class="sc-label">Total de horas</div><div class="sc-val" style="color:var(--amber)">${totalHoras}</div></div>
-    </div>
-    <button class="btn-primary" onclick="abrirModalServente()" style="margin-bottom:12px">+ Registrar dia trabalhado</button>
-    <button class="btn-secondary" onclick="gerarPDFServente()" style="margin-bottom:12px">📄 Gerar relatório PDF</button>
-    <div class="card">
-      ${ordenadas.length===0
-        ? `<div class="empty"><div class="empty-icon">🧱</div><p>Nenhum dia registrado ainda</p></div>`
-        : ordenadas.map(d=>`
-          <div class="gasto-item">
-            <div class="gasto-icon" style="background:#fdf3e3">🧱</div>
-            <div class="gasto-info">
-              <div class="gi-cat">${new Date(d.data+'T00:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})}</div>
-              <div class="gi-desc">${d.horasFormatado||decimalParaHoras(d.horas)} trabalhadas${d.obs?' · '+d.obs:''}</div>
-              <div class="gi-data">Registrado por: ${d.quem||''}</div>
-              <div class="gasto-actions">
-                <button class="btn-del" onclick="deletarServente('${d.id}')">🗑️ Excluir</button>
-              </div>
-            </div>
-            <div class="gasto-valor">
-              <div class="gv-val" style="color:var(--amber)">${d.horasFormatado||decimalParaHoras(d.horas)}</div>
-            </div>
-          </div>`).join('')}
-    </div>
-  `;
-}
-
-window.abrirModalServente = function() {
-  const overlay = document.getElementById('modal-overlay');
-  const content = document.getElementById('modal-content');
-  content.innerHTML = `
-    <div class="modal-handle"></div>
-    <div class="modal-title">Registrar dia trabalhado</div>
-    <div class="form-group">
-      <label class="form-label">Data</label>
-      <input class="form-input" id="s-data" type="date" value="${new Date().toISOString().slice(0,10)}">
-    </div>
-    <div class="form-group">
-      <label class="form-label">Horas trabalhadas (ex: 8:00 ou 1:30)</label>
-      <input class="form-input" id="s-horas" type="text" inputmode="text" placeholder="Ex: 8:00 ou 7:30">
-    </div>
-    <div class="form-group">
-      <label class="form-label">Observação (opcional)</label>
-      <input class="form-input" id="s-obs" type="text" placeholder="Ex: Limpeza da obra">
-    </div>
-    <button class="btn-primary" id="btn-salvar-servente">Salvar</button>
-    <button class="btn-secondary" onclick="fecharModal()">Cancelar</button>
-  `;
-  overlay.classList.add('open');
-  document.getElementById('btn-salvar-servente').onclick = salvarServente;
-};
-
-async function salvarServente() {
-  const btn = document.getElementById('btn-salvar-servente');
-  btn.innerHTML = '<span class="spinner"></span>';
-  btn.disabled = true;
-  const data = document.getElementById('s-data').value;
-  const horasRaw = document.getElementById('s-horas').value.trim();
-  const horas = horasParaDecimal(horasRaw);
-  const horasFormatado = decimalParaHoras(horas);
-  const obs = document.getElementById('s-obs').value.trim();
-  if(!data || !horas) { showToast('Preencha data e horas'); btn.innerHTML='Salvar';btn.disabled=false; return; }
-  try {
-    await addDoc(collection(db,'serventes'), {
-      data, horas, horasFormatado, obs,
-      quem: currentUser.displayName||currentUser.email.split('@')[0],
-      uid: currentUser.uid,
-      criadoEm: new Date().toISOString()
-    });
-    showToast('Dia registrado!');
-    fecharModal();
-  } catch(e) { showToast('Erro ao salvar.'); console.error(e); }
-  btn.innerHTML='Salvar';btn.disabled=false;
-}
-
-window.deletarServente = function(id) {
-  showConfirm({
-    titulo: 'Excluir registro',
-    mensagem: 'Deseja excluir este dia registrado?',
-    confirmLabel: 'Excluir',
-    danger: true,
-    onConfirm: async () => {
-      try { await deleteDoc(doc(db,'serventes',id)); showToast('Registro excluído!'); } catch(e){ showToast('Erro ao excluir.'); }
-    }
-  });
-};
-
-window.gerarPDFServente = function() {
-  const ordenadas = [...serventes].sort((a,b)=>new Date(a.data)-new Date(b.data));
-  const totalDias = ordenadas.length;
-  const totalHoras = ordenadas.reduce((s,d)=>s+(d.horas||0),0);
-  const hoje = new Date().toLocaleDateString('pt-BR');
-  const linhas = ordenadas.map((d,i)=>`
-    <tr style="background:${i%2===0?'#f9f9f9':'#fff'}">
-      <td style="padding:8px 12px;border-bottom:1px solid #eee">${new Date(d.data+'T00:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})}</td>
-      <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:center;font-weight:500">${d.horasFormatado||decimalParaHoras(d.horas)}</td>
-      <td style="padding:8px 12px;border-bottom:1px solid #eee;color:#666">${d.obs||'—'}</td>
-    </tr>`).join('');
-  const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
-  <title>Relatório Servente - Nossa Casa</title>
-  <style>
-    body{font-family:Arial,sans-serif;margin:0;padding:32px;color:#1a1a1a}
-    h1{color:#c17f24;font-size:24px;margin-bottom:4px}
-    .sub{color:#666;font-size:13px;margin-bottom:24px}
-    table{width:100%;border-collapse:collapse;margin-top:16px}
-    th{background:#c17f24;color:#fff;padding:10px 12px;text-align:left;font-size:13px}
-    .totais{margin-top:24px;background:#fdf3e3;border-radius:8px;padding:16px;display:flex;gap:32px}
-    .tot-item .tot-label{font-size:12px;color:#666}
-    .tot-item .tot-val{font-size:22px;font-weight:bold;color:#c17f24}
-    .rodape{margin-top:32px;font-size:11px;color:#999;text-align:center}
-  </style></head><body>
-  <h1>🏠 Nossa Casa — Relatório do Servente</h1>
-  <div class="sub">Gerado em ${hoje}</div>
-  <table>
-    <thead><tr><th>Data</th><th style="text-align:center">Horas</th><th>Observação</th></tr></thead>
-    <tbody>${linhas}</tbody>
-  </table>
-  <div class="totais">
-    <div class="tot-item"><div class="tot-label">Total de dias</div><div class="tot-val">${totalDias}</div></div>
-    <div class="tot-item"><div class="tot-label">Total de horas</div><div class="tot-val">${decimalParaHoras(totalHoras)}</div></div>
-  </div>
-  <div class="rodape">Relatório gerado pelo app Nossa Casa</div>
-  <script>window.onload=()=>{window.print()}<\/script>
-  </body></html>`;
-  const blob = new Blob([html], {type:'text/html'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'relatorio-servente.html';
-  a.click();
-  URL.revokeObjectURL(url);
-  showToast('PDF gerado! Abra o arquivo e use Imprimir > Salvar como PDF');
-};
 
 // ===================== RELATÓRIOS =====================
 function renderRelatorios() {
@@ -1767,7 +1527,9 @@ async function salvarEtapa() {
   try {
     await setDoc(doc(db,'etapas',`etapa_${num}`), {
       numero:num, valorBruto:bruto, taxas, data, obs, liberado:true,
-      uid:currentUser.uid, criadoEm:new Date().toISOString()
+      uid:currentUser.uid,
+      quem: currentUser.displayName||currentUser.email.split('@')[0],
+      criadoEm:new Date().toISOString()
     });
     showToast('Etapa registrada!');
     fecharModal();
@@ -3082,6 +2844,51 @@ window.gerarPDFGastosFiltrado = function() {
       :'<table><thead><tr><th>#</th><th>Data</th><th>Categoria</th><th>Descrição</th><th>Pagamento</th><th>Status</th><th>Valor</th></tr></thead><tbody>'+rows+'<tr class="tr"><td colspan="6">TOTAL</td><td>'+r$(total)+'</td></tr></tbody></table>');
 
   gerarPDF(titulo, body);
+};
+
+window.abrirModalPrevisaoEtapa = function(num) {
+  const et = etapas.find(e=>e.numero===num);
+  const valorAtual = et ? (et.valorPrevisto||0) : 0;
+  const overlay = document.getElementById('modal-overlay');
+  const mc = document.getElementById('modal-content');
+  mc.innerHTML = `
+    <div class="modal-handle"></div>
+    <div class="modal-title">Previsão — Etapa ${num}</div>
+    <div class="form-group">
+      <label class="form-label">Valor previsto para esta etapa (R$)</label>
+      <input class="form-input input-moeda" id="prev-valor" type="text" inputmode="numeric" placeholder="0,00">
+    </div>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:16px">Estimativa do valor que a Caixa deve liberar nesta etapa.</div>
+    <button class="btn-primary" id="btn-salvar-prev">Salvar previsão</button>
+    <button class="btn-secondary" onclick="fecharModal()">Cancelar</button>
+  `;
+  overlay.classList.add('open');
+  setupMoeda('prev-valor');
+  if(valorAtual) {
+    const el = document.getElementById('prev-valor');
+    if(el) { el.value = valorAtual.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); el.dataset.valor = valorAtual.toFixed(2); }
+  }
+  document.getElementById('btn-salvar-prev').onclick = async () => {
+    const valor = getValorInput('prev-valor');
+    if(!valor) { showToast('Informe o valor previsto'); return; }
+    try {
+      if(et && et.id) {
+        await updateDoc(doc(db,'etapas',et.id), {valorPrevisto: valor});
+      } else {
+        await setDoc(doc(db,'etapas','etapa_'+num), {
+          numero:num, valorPrevisto:valor, liberado:false,
+          uid:currentUser.uid, criadoEm:new Date().toISOString()
+        });
+      }
+      showToast('Previsão salva!');
+      fecharModal();
+    } catch(e) { showToast('Erro ao salvar.'); console.error(e); }
+  };
+};
+
+window.deletarEtapaById = function(btn) {
+  const id = btn.getAttribute('data-eid');
+  if(id) window.deletarEtapa(id);
 };
 
 window.fazerLogout = async function() {
