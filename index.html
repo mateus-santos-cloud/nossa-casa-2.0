@@ -1279,7 +1279,7 @@ function renderMaodeobra() {
     ? '<div class="empty"><div class="empty-icon">👷</div><p>Nenhum registro ainda</p></div>'
     : profList.map(p=>{
         const horas = decimalParaHoras(p.totalHoras);
-        return '<div class="card" style="margin-bottom:8px;cursor:pointer" onclick="abrirDetalhesProfissional('+JSON.stringify(p.nome)+')">'
+        return '<div class="card" style="margin-bottom:8px;cursor:pointer" data-prof="'+p.nome+'" onclick="abrirDetalhesProfissionalById(this)">'
           +'<div style="display:flex;justify-content:space-between;align-items:center">'
             +'<div style="font-size:14px;font-weight:500">👷 '+p.nome+'</div>'
             +'<div style="font-size:11px;color:var(--text-hint)">ver detalhes ›</div>'
@@ -3086,6 +3086,11 @@ window.duplicarGasto = function(id) {
       } catch(e) { showToast('Erro ao duplicar.'); console.error(e); }
     }
   });
+};
+
+window.abrirDetalhesProfissionalById = function(el) {
+  const nome = el.getAttribute('data-prof');
+  if(nome) window.abrirDetalhesProfissional(nome);
 };
 
 window.fazerLogout = async function() {
