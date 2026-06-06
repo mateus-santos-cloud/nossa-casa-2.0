@@ -182,6 +182,9 @@
   .config-val{font-size:13px;color:var(--text-muted)}
   .btn-logout{width:100%;background:var(--red-light);color:var(--red);border:1px solid rgba(179,58,58,0.2);border-radius:var(--radius-sm);padding:13px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;cursor:pointer;margin-top:20px}
 
+  .tag.atrasado{background:#fdeaea;color:#b33a3a;font-weight:600;animation:pulse 2s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.7}}
+  .gasto-item.atrasado{border-left:3px solid var(--red);background:linear-gradient(to right,#fff8f8,transparent)}
   .toast{position:fixed;top:20px;left:50%;transform:translateX(-50%) translateY(-80px);background:var(--green);color:#fff;padding:10px 20px;border-radius:30px;font-size:14px;z-index:999;transition:transform 0.3s;white-space:nowrap}
   .toast.show{transform:translateX(-50%) translateY(0)}
   .confirm-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;display:flex;align-items:center;justify-content:center;padding:24px;opacity:0;pointer-events:none;transition:opacity 0.2s}
@@ -991,7 +994,10 @@ function renderGastoItem(g, showActions=true) {
   const data = g.data ? new Date(g.data+'T00:00:00').toLocaleDateString('pt-BR') : '';
   const isParcela = g.formaPagamento === 'cartao_parcelado';
   const parcelaInfo = isParcela && g.totalParcelas ? `${g.parcelaAtual||1}/${g.totalParcelas}x` : '';
-  return `<div class="gasto-item">
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  const dg = g.data ? new Date(g.data+'T00:00:00') : null;
+  const atrasado = g.status==='pendente' && dg && dg < hoje;
+  return `<div class="gasto-item${atrasado?' atrasado':''}">
     <div class="gasto-icon" style="background:${cat.cor}22">${cat.icon}</div>
     <div class="gasto-info">
       <div class="gi-cat">${cat.label}</div>
@@ -1004,7 +1010,13 @@ function renderGastoItem(g, showActions=true) {
     </div>
     <div class="gasto-valor">
       <div class="gv-val ${g.status==='pendente'?'pendente':''}">${fmtR(g.valor)}</div>
-      <div class="gv-status"><span class="tag ${g.status==='pago'?'pago':'pendente'}">${g.status==='pago'?'Pago':'Pendente'}</span></div>
+      <div class="gv-status">${(()=>{
+        if(g.status==='pago') return '<span class="tag pago">Pago</span>';
+        const hoje = new Date(); hoje.setHours(0,0,0,0);
+        const dg = g.data ? new Date(g.data+'T00:00:00') : null;
+        if(dg && dg < hoje) return '<span class="tag atrasado">⚠️ Atrasado</span>';
+        return '<span class="tag pendente">Pendente</span>';
+      })()}</div>
       ${parcelaInfo?`<div class="gv-parcela">${parcelaInfo}</div>`:''}
     </div>
   </div>`;
@@ -1131,7 +1143,7 @@ function renderEtapas() {
   const totalBruto = etapasLib.reduce((s,e)=>s+(e.valorBruto||0),0);
   const totalTaxas = etapasLib.reduce((s,e)=>s+(e.taxas||0),0);
   const totalLiq = totalBruto - totalTaxas;
-  const totalPrevisto = etapas.filter(e=>!e.liberado&&e.valorPrevisto).reduce((s,e)=>s+(e.valorPrevisto||0),0);
+  const totalPrevisto = etapas.filter(e=>!e.liberado&&e.valorPrevisto).reduce((s,e)=>s+(e.liquidoPrevisto||e.valorPrevisto||0),0);
   return `
     <div class="card" style="margin-bottom:12px">
       <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px">💰 Resumo financeiro</div>
@@ -1208,7 +1220,7 @@ function renderEtapaItem(num, et) {
     return '<div class="etapa-item">'
       +'<div class="etapa-header"><div class="etapa-name">Etapa '+num+'</div><span class="etapa-badge badge-pendente">⏳ Pendente</span></div>'
       +'<div style="font-size:12px;color:var(--text-hint);margin-top:4px">Aguardando liberação da Caixa</div>'
-      +(valorPrevisto>0?'<div style="font-size:12px;color:var(--amber);margin-top:4px;font-weight:500">Previsão: '+fmtR(valorPrevisto)+'</div>':'')
+      +(valorPrevisto>0?'<div style="font-size:12px;color:var(--amber);margin-top:4px;font-weight:500">Previsão bruta: '+fmtR(valorPrevisto)+(et&&et.taxasPrevistas?'<br><span style="font-size:11px;color:var(--red)">Taxas estimadas: '+fmtR(et.taxasPrevistas||0)+'</span><br><span style="font-size:11px;color:var(--green-mid);font-weight:600">Líquido previsto: '+fmtR((et.liquidoPrevisto||valorPrevisto))+'</span>':'')+'</div>':'')
       +'<div class="gasto-actions">'
         +'<button class="btn-edit" onclick="abrirTarefasEtapa('+num+')">📋 Tarefas</button>'
         +'<button class="btn-edit" onclick="abrirModalPrevisaoEtapa('+num+')">💰 Previsão</button>'
@@ -1940,7 +1952,13 @@ window.abrirRelatorioTaxas = function() {
           </div>
           <div class="gasto-valor">
             <div class="gv-val red">${fmtR(g.valor)}</div>
-            <div class="gv-status"><span class="tag ${g.status==='pago'?'pago':'pendente'}">${g.status==='pago'?'Pago':'Pendente'}</span></div>
+            <div class="gv-status">${(()=>{
+        if(g.status==='pago') return '<span class="tag pago">Pago</span>';
+        const hoje = new Date(); hoje.setHours(0,0,0,0);
+        const dg = g.data ? new Date(g.data+'T00:00:00') : null;
+        if(dg && dg < hoje) return '<span class="tag atrasado">⚠️ Atrasado</span>';
+        return '<span class="tag pendente">Pendente</span>';
+      })()}</div>
           </div>
         </div>`;
       }).join('');
@@ -2394,7 +2412,7 @@ window.abrirContasVencer = function() {
                 </div>
                 <div class="gasto-valor">
                   <div class="gv-val pendente">${fmtR(c.valor)}</div>
-                  <div class="gv-status"><span class="tag pendente">Pendente</span></div>
+                  <div class="gv-status">${(()=>{const hoje=new Date();hoje.setHours(0,0,0,0);const dp=c.data;if(dp&&dp<hoje)return '<span class="tag atrasado">⚠️ Atrasado</span>';return '<span class="tag pendente">Pendente</span>';})()}</div>
                 </div>
               </div>`;
             }).join('')}
@@ -2840,34 +2858,46 @@ window.gerarPDFGastosFiltrado = function() {
 window.abrirModalPrevisaoEtapa = function(num) {
   const et = etapas.find(e=>e.numero===num);
   const valorAtual = et ? (et.valorPrevisto||0) : 0;
+  const taxasAtual = et ? (et.taxasPrevistas||0) : 0;
   const overlay = document.getElementById('modal-overlay');
   const mc = document.getElementById('modal-content');
   mc.innerHTML = `
     <div class="modal-handle"></div>
     <div class="modal-title">Previsão — Etapa ${num}</div>
     <div class="form-group">
-      <label class="form-label">Valor previsto para esta etapa (R$)</label>
+      <label class="form-label">Valor previsto bruto (R$)</label>
       <input class="form-input input-moeda" id="prev-valor" type="text" inputmode="numeric" placeholder="0,00">
     </div>
-    <div style="font-size:12px;color:var(--text-muted);margin-bottom:16px">Estimativa do valor que a Caixa deve liberar nesta etapa.</div>
+    <div class="form-group">
+      <label class="form-label">Estimativa de taxas (R$)</label>
+      <input class="form-input input-moeda" id="prev-taxas" type="text" inputmode="numeric" placeholder="0,00">
+    </div>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:16px">O valor líquido será calculado automaticamente (bruto − taxas).</div>
     <button class="btn-primary" id="btn-salvar-prev">Salvar previsão</button>
     <button class="btn-secondary" onclick="fecharModal()">Cancelar</button>
   `;
   overlay.classList.add('open');
   setupMoeda('prev-valor');
+  setupMoeda('prev-taxas');
   if(valorAtual) {
     const el = document.getElementById('prev-valor');
     if(el) { el.value = valorAtual.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); el.dataset.valor = valorAtual.toFixed(2); }
   }
+  if(taxasAtual) {
+    const el = document.getElementById('prev-taxas');
+    if(el) { el.value = taxasAtual.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); el.dataset.valor = taxasAtual.toFixed(2); }
+  }
   document.getElementById('btn-salvar-prev').onclick = async () => {
     const valor = getValorInput('prev-valor');
+    const taxas = getValorInput('prev-taxas')||0;
     if(!valor) { showToast('Informe o valor previsto'); return; }
+    const liquido = valor - taxas;
     try {
       if(et && et.id) {
-        await updateDoc(doc(db,'etapas',et.id), {valorPrevisto: valor});
+        await updateDoc(doc(db,'etapas',et.id), {valorPrevisto: valor, taxasPrevistas: taxas, liquidoPrevisto: liquido});
       } else {
         await setDoc(doc(db,'etapas','etapa_'+num), {
-          numero:num, valorPrevisto:valor, liberado:false,
+          numero:num, valorPrevisto:valor, taxasPrevistas:taxas, liquidoPrevisto:liquido, liberado:false,
           uid:currentUser.uid, criadoEm:new Date().toISOString()
         });
       }
