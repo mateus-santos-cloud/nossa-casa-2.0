@@ -295,11 +295,8 @@ function render() {
     <div id="pg-etapas" class="page ${paginaAtual==='etapas'?'active':''}">
       ${renderEtapas()}
     </div>
-    <div id="pg-diarias" class="page ${paginaAtual==='diarias'?'active':''}">
-      ${renderDiarias()}
-    </div>
-    <div id="pg-serventes" class="page ${paginaAtual==='serventes'?'active':''}">
-      ${renderServentes()}
+    <div id="pg-maodeobra" class="page ${paginaAtual==='maodeobra'?'active':''}">
+      ${renderMaodeobra()}
     </div>
     <div id="pg-relatorios" class="page ${paginaAtual==='relatorios'?'active':''}">
       ${renderRelatorios()}
@@ -336,7 +333,7 @@ function render() {
 }
 
 function renderHeader() {
-  const titles = {dashboard:'Nossa Casa 🏠',gastos:'Gastos',etapas:'Etapas Caixa',diarias:'Pedreiro 👷',serventes:'Servente 🧱',relatorios:'Relatórios',config:'Configurações'};
+  const titles = {dashboard:'Nossa Casa 🏠',gastos:'Gastos',etapas:'Etapas Caixa',maodeobra:'Mão de Obra 👷',relatorios:'Relatórios',config:'Configurações'};
   return `<div class="header">
     <div class="header-top">
       <div>
@@ -352,8 +349,7 @@ function renderNav() {
     {id:'dashboard',icon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>`,label:'Início'},
     {id:'gastos',icon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg>`,label:'Gastos'},
     {id:'etapas',icon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>`,label:'Etapas'},
-    {id:'diarias',icon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg>`,label:'Pedreiro'},
-    {id:'serventes',icon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>`,label:'Servente'},
+    {id:'maodeobra',icon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>`,label:'Mão de obra'},
     {id:'relatorios',icon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>`,label:'Relatórios'},
     {id:'config',icon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>`,label:'Config'},
   ];
@@ -859,10 +855,14 @@ function renderDashboard() {
   }
 
   // Pedreiro e servente do mês
-  const diasPedMes = diarias.filter(d=>{const dt=new Date(d.data+'T00:00:00');return dt.getMonth()===mesAtual&&dt.getFullYear()===anoAtual;});
-  const horasPedMes = decimalParaHoras(diasPedMes.reduce((s,d)=>s+(d.horas||0),0));
-  const diasSerMes = serventes.filter(d=>{const dt=new Date(d.data+'T00:00:00');return dt.getMonth()===mesAtual&&dt.getFullYear()===anoAtual;});
-  const horasSerMes = decimalParaHoras(diasSerMes.reduce((s,d)=>s+(d.horas||0),0));
+  const todosMao = [
+    ...diarias.map(d=>({...d,profissional:'Pedreiro'})),
+    ...serventes.map(d=>({...d,profissional:'Servente'})),
+    ...maodeobra
+  ];
+  const maoMes = todosMao.filter(d=>{const dt=new Date(d.data+'T00:00:00');return dt.getMonth()===mesAtual&&dt.getFullYear()===anoAtual;});
+  const porProfMes = {};
+  maoMes.forEach(r=>{const p=r.profissional||'Outros';if(!porProfMes[p]){porProfMes[p]={dias:0,horas:0};}porProfMes[p].dias++;porProfMes[p].horas+=r.horas||0;});
   const nomeMes = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'][mesAtual];
 
   return `
@@ -906,24 +906,16 @@ function renderDashboard() {
       })()}
     </div>
 
-    <!-- PEDREIRO E SERVENTE DO MÊS -->
+    <!-- MÃO DE OBRA DO MÊS -->
     <div class="card" style="margin-bottom:12px;cursor:pointer" onclick="abrirMaoDeObraMes()">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
         <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.6px">👷 Mão de obra em ${nomeMes} ›</div>
-        <div style="font-size:11px;color:var(--text-hint)">ver detalhes ›</div>
+        <div style="font-size:11px;color:var(--text-hint)">${maoMes.length} registro${maoMes.length!==1?'s':''}</div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <div style="background:var(--green-light);border-radius:8px;padding:10px">
-          <div style="font-size:11px;color:var(--green-mid);margin-bottom:2px">Pedreiro</div>
-          <div style="font-size:15px;font-weight:600;color:var(--green-mid)">${diasPedMes.length} dias</div>
-          <div style="font-size:11px;color:var(--green-mid)">${horasPedMes} horas</div>
-        </div>
-        <div style="background:var(--amber-light);border-radius:8px;padding:10px">
-          <div style="font-size:11px;color:var(--amber);margin-bottom:2px">Servente</div>
-          <div style="font-size:15px;font-weight:600;color:var(--amber)">${diasSerMes.length} dias</div>
-          <div style="font-size:11px;color:var(--amber)">${horasSerMes} horas</div>
-        </div>
-      </div>
+      ${Object.keys(porProfMes).length===0
+        ? '<div style="font-size:13px;color:var(--text-muted)">Nenhum registro neste mês</div>'
+        : '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'+Object.entries(porProfMes).map(([p,v])=>'<div style="background:var(--green-light);border-radius:8px;padding:10px"><div style="font-size:11px;color:var(--green-mid);margin-bottom:2px">'+p+'</div><div style="font-size:14px;font-weight:600;color:var(--green-mid)">'+v.dias+' dias</div><div style="font-size:11px;color:var(--green-mid)">'+decimalParaHoras(v.horas)+' horas</div></div>').join('')+'</div>'
+      }
     </div>
 
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
@@ -1257,76 +1249,206 @@ function renderEtapaItem(num, et) {
 }
 
 
-// ===================== DIÁRIAS PEDREIRO =====================
-function renderDiarias() {
-  const totalDias = diarias.length;
-  const totalHorasDec = diarias.reduce((s,d)=>s+(d.horas||0),0);
-  const totalHoras = decimalParaHoras(totalHorasDec);
-  const ordenadas = [...diarias].sort((a,b)=>new Date(b.data)-new Date(a.data));
+// ===================== MÃO DE OBRA =====================
+function renderMaodeobra() {
+  // Merge diarias (pedreiro legacy) + serventes (legacy) + maodeobra (new)
+  const todos = [
+    ...diarias.map(d=>({...d, profissional:'Pedreiro', _col:'diarias'})),
+    ...serventes.map(d=>({...d, profissional:'Servente', _col:'serventes'})),
+    ...maodeobra
+  ];
+
+  // Group by profissional
+  const porProf = {};
+  todos.forEach(r=>{
+    const p = r.profissional||'Outros';
+    if(!porProf[p]) porProf[p]={nome:p,registros:[],totalHoras:0,totalDias:0};
+    porProf[p].registros.push(r);
+    porProf[p].totalHoras += r.horas||0;
+    porProf[p].totalDias++;
+  });
+
+  const profList = Object.values(porProf).sort((a,b)=>a.nome.localeCompare(b.nome));
+  const totalDiasGeral = todos.length;
+  const totalHorasGeral = decimalParaHoras(todos.reduce((s,r)=>s+(r.horas||0),0));
+
+  const profCards = profList.length===0
+    ? '<div class="empty"><div class="empty-icon">👷</div><p>Nenhum registro ainda</p></div>'
+    : profList.map(p=>{
+        const horas = decimalParaHoras(p.totalHoras);
+        return '<div class="card" style="margin-bottom:8px;cursor:pointer" onclick="abrirDetalhesProfissional('+JSON.stringify(p.nome)+')">'
+          +'<div style="display:flex;justify-content:space-between;align-items:center">'
+            +'<div style="font-size:14px;font-weight:500">👷 '+p.nome+'</div>'
+            +'<div style="font-size:11px;color:var(--text-hint)">ver detalhes ›</div>'
+          +'</div>'
+          +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">'
+            +'<div style="background:var(--green-light);border-radius:6px;padding:8px;text-align:center">'
+              +'<div style="font-size:11px;color:var(--green-mid)">Dias</div>'
+              +'<div style="font-size:16px;font-weight:700;color:var(--green-mid)">'+p.totalDias+'</div>'
+            +'</div>'
+            +'<div style="background:var(--green-light);border-radius:6px;padding:8px;text-align:center">'
+              +'<div style="font-size:11px;color:var(--green-mid)">Horas</div>'
+              +'<div style="font-size:16px;font-weight:700;color:var(--green-mid)">'+horas+'</div>'
+            +'</div>'
+          +'</div>'
+        +'</div>';
+      }).join('');
+
   return `
-    <div class="stats-grid">
-      <div class="stat-card"><div class="sc-label">Total de dias</div><div class="sc-val green">${totalDias}</div></div>
-      <div class="stat-card"><div class="sc-label">Total de horas</div><div class="sc-val green">${totalHoras}</div></div>
+    <div class="stats-grid" style="margin-bottom:12px">
+      <div class="stat-card"><div class="sc-label">Total de profissionais</div><div class="sc-val green">${profList.length}</div></div>
+      <div class="stat-card"><div class="sc-label">Total de dias</div><div class="sc-val green">${totalDiasGeral}</div></div>
     </div>
-    <button class="btn-primary" onclick="abrirModalDiaria()" style="margin-bottom:12px">+ Registrar dia trabalhado</button>
-    <button class="btn-secondary" onclick="gerarPDFPedreiro()" style="margin-bottom:12px">📄 Gerar relatório PDF</button>
-    <div class="card">
-      ${ordenadas.length===0
-        ? '<div class="empty"><div class="empty-icon">👷</div><p>Nenhum dia registrado ainda</p></div>'
-        : ordenadas.map(d=>{
-            const data = new Date(d.data+'T00:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'});
-            const hrs = d.horasFormatado||decimalParaHoras(d.horas);
-            return '<div class="gasto-item">'
-              +'<div class="gasto-icon" style="background:#e8f5f0">👷</div>'
-              +'<div class="gasto-info">'
-                +'<div class="gi-cat">'+data+'</div>'
-                +(d.obs?'<div class="gi-desc">'+d.obs+'</div>':'')
-                +'<div class="gi-data">Registrado por: '+(d.quem||'')+'</div>'
-                +'<div class="gasto-actions"><button class="btn-del" data-did="'+d.id+'" onclick="deletarDiariaById(this)">🗑️ Excluir</button></div>'
-              +'</div>'
-              +'<div class="gasto-valor"><div class="gv-val green">'+hrs+'</div></div>'
-            +'</div>';
-          }).join('')}
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <button class="btn-primary" onclick="abrirModalRegistroMao()" style="flex:1;margin-bottom:0">+ Registrar dia trabalhado</button>
+      <button onclick="abrirModalNovoProfissional()" style="background:var(--green-light);color:var(--green);border:none;border-radius:8px;padding:0 14px;font-size:12px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap">+ Profissional</button>
     </div>
+    ${profCards}
   `;
 }
 
-// ===================== SERVENTES =====================
-function renderServentes() {
-  const totalDias = serventes.length;
-  const totalHorasDec = serventes.reduce((s,d)=>s+(d.horas||0),0);
-  const totalHoras = decimalParaHoras(totalHorasDec);
-  const ordenadas = [...serventes].sort((a,b)=>new Date(b.data)-new Date(a.data));
-  return `
-    <div class="stats-grid">
-      <div class="stat-card"><div class="sc-label">Total de dias</div><div class="sc-val" style="color:var(--amber)">${totalDias}</div></div>
-      <div class="stat-card"><div class="sc-label">Total de horas</div><div class="sc-val" style="color:var(--amber)">${totalHoras}</div></div>
+window.abrirDetalhesProfissional = function(nome) {
+  const overlay = document.getElementById('modal-overlay');
+  const mc = document.getElementById('modal-content');
+  const todos = [
+    ...diarias.map(d=>({...d,profissional:'Pedreiro',_col:'diarias'})),
+    ...serventes.map(d=>({...d,profissional:'Servente',_col:'serventes'})),
+    ...maodeobra
+  ];
+  const registros = todos.filter(r=>(r.profissional||'Outros')===nome).sort((a,b)=>new Date(b.data)-new Date(a.data));
+  const totalHoras = decimalParaHoras(registros.reduce((s,r)=>s+(r.horas||0),0));
+
+  const linhas = registros.map(r=>{
+    const data = new Date(r.data+'T00:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'});
+    const hrs = r.horasFormatado||decimalParaHoras(r.horas||0);
+    return '<div class="gasto-item">'
+      +'<div class="gasto-icon" style="background:var(--green-light)">👷</div>'
+      +'<div class="gasto-info">'
+        +'<div class="gi-cat">'+data+'</div>'
+        +(r.obs?'<div class="gi-desc">'+r.obs+'</div>':'')
+        +'<div class="gi-data">Registrado por: '+(r.quem||'')+'</div>'
+        +'<div class="gasto-actions"><button class="btn-del" data-rid="'+r.id+'" data-col="'+(r._col||'maodeobra')+'" onclick="deletarRegistroMao(this)">🗑️ Excluir</button></div>'
+      +'</div>'
+      +'<div class="gasto-valor"><div class="gv-val green">'+hrs+'</div></div>'
+    +'</div>';
+  }).join('');
+
+  mc.innerHTML = '<div class="modal-handle"></div>'
+    +'<div class="modal-title">👷 '+nome+'</div>'
+    +'<div class="stats-grid" style="margin-bottom:12px">'
+      +'<div class="stat-card"><div class="sc-label">Total de dias</div><div class="sc-val green">'+registros.length+'</div></div>'
+      +'<div class="stat-card"><div class="sc-label">Total de horas</div><div class="sc-val green">'+totalHoras+'</div></div>'
+    +'</div>'
+    +'<button onclick="gerarPDFProfissional('+JSON.stringify(nome)+')" style="width:100%;background:var(--green-light);color:var(--green);border:none;border-radius:8px;padding:10px;font-family:DM Sans,sans-serif;font-size:13px;font-weight:500;cursor:pointer;margin-bottom:12px">📄 Gerar PDF</button>'
+    +'<div class="modal-scroll-list">'+(linhas||'<div class="empty"><p>Nenhum registro</p></div>')+'</div>'
+    +'<div class="modal-footer"><button class="btn-fechar" onclick="fecharModal()">✕ Fechar</button></div>';
+  overlay.classList.add('open');
+};
+
+window.deletarRegistroMao = function(btn) {
+  const id = btn.getAttribute('data-rid');
+  const col = btn.getAttribute('data-col');
+  showConfirm({
+    titulo: 'Excluir registro',
+    mensagem: 'Deseja excluir este dia registrado?',
+    confirmLabel: 'Excluir',
+    danger: true,
+    onConfirm: async () => {
+      try { await deleteDoc(doc(db,col,id)); showToast('Registro excluído!'); fecharModal(); } catch(e){ showToast('Erro ao excluir.'); }
+    }
+  });
+};
+
+window.abrirModalRegistroMao = function() {
+  const overlay = document.getElementById('modal-overlay');
+  const mc = document.getElementById('modal-content');
+  const opts = profissionaisMao.map(p=>'<option value="'+p+'">'+p+'</option>').join('');
+  mc.innerHTML = `
+    <div class="modal-handle"></div>
+    <div class="modal-title">Registrar dia trabalhado</div>
+    <div class="form-group">
+      <label class="form-label">Profissional</label>
+      <select class="form-input" id="mao-prof">${opts}</select>
     </div>
-    <button class="btn-primary" onclick="abrirModalServente()" style="margin-bottom:12px">+ Registrar dia trabalhado</button>
-    <button class="btn-secondary" onclick="gerarPDFServente()" style="margin-bottom:12px">📄 Gerar relatório PDF</button>
-    <div class="card">
-      ${ordenadas.length===0
-        ? '<div class="empty"><div class="empty-icon">🧱</div><p>Nenhum dia registrado ainda</p></div>'
-        : ordenadas.map(d=>{
-            const data = new Date(d.data+'T00:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'});
-            const hrs = d.horasFormatado||decimalParaHoras(d.horas);
-            return '<div class="gasto-item">'
-              +'<div class="gasto-icon" style="background:#fdf3e3">🧱</div>'
-              +'<div class="gasto-info">'
-                +'<div class="gi-cat">'+data+'</div>'
-                +(d.obs?'<div class="gi-desc">'+d.obs+'</div>':'')
-                +'<div class="gi-data">Registrado por: '+(d.quem||'')+'</div>'
-                +'<div class="gasto-actions"><button class="btn-del" data-sid="'+d.id+'" onclick="deletarServenteById(this)">🗑️ Excluir</button></div>'
-              +'</div>'
-              +'<div class="gasto-valor"><div class="gv-val" style="color:var(--amber)">'+hrs+'</div></div>'
-            +'</div>';
-          }).join('')}
+    <div class="form-group">
+      <label class="form-label">Data</label>
+      <input class="form-input" id="mao-data" type="date" value="${new Date().toISOString().slice(0,10)}">
     </div>
+    <div class="form-group">
+      <label class="form-label">Horas trabalhadas (ex: 8:00 ou 7:30)</label>
+      <input class="form-input" id="mao-horas" type="text" inputmode="text" placeholder="Ex: 8:00">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Observação (opcional)</label>
+      <input class="form-input" id="mao-obs" type="text" placeholder="Ex: Levantamento de parede">
+    </div>
+    <button class="btn-primary" id="btn-salvar-mao">Salvar</button>
+    <button class="btn-secondary" onclick="fecharModal()">Cancelar</button>
   `;
-}
+  overlay.classList.add('open');
+  document.getElementById('btn-salvar-mao').onclick = async () => {
+    const prof = document.getElementById('mao-prof').value;
+    const data = document.getElementById('mao-data').value;
+    const horasRaw = document.getElementById('mao-horas').value.trim();
+    const horas = horasParaDecimal(horasRaw);
+    const horasFormatado = decimalParaHoras(horas);
+    const obs = document.getElementById('mao-obs').value.trim();
+    if(!data||!horas) { showToast('Preencha data e horas'); return; }
+    try {
+      await addDoc(collection(db,'maodeobra'), {
+        profissional:prof, data, horas, horasFormatado, obs,
+        quem: currentUser.displayName||currentUser.email.split('@')[0],
+        uid: currentUser.uid, criadoEm: new Date().toISOString()
+      });
+      showToast('Dia registrado!');
+      fecharModal();
+    } catch(e) { showToast('Erro ao salvar.'); console.error(e); }
+  };
+};
 
+window.abrirModalNovoProfissional = function() {
+  const overlay = document.getElementById('modal-overlay');
+  const mc = document.getElementById('modal-content');
+  mc.innerHTML = `
+    <div class="modal-handle"></div>
+    <div class="modal-title">Novo profissional</div>
+    <div class="form-group">
+      <label class="form-label">Nome do profissional</label>
+      <input class="form-input" id="novo-prof-nome" type="text" placeholder="Ex: Eletricista">
+    </div>
+    <button class="btn-primary" id="btn-salvar-prof">Adicionar</button>
+    <button class="btn-secondary" onclick="fecharModal()">Cancelar</button>
+  `;
+  overlay.classList.add('open');
+  document.getElementById('btn-salvar-prof').onclick = () => {
+    const nome = document.getElementById('novo-prof-nome').value.trim();
+    if(!nome) { showToast('Digite o nome'); return; }
+    if(!profissionaisMao.includes(nome)) { profissionaisMao.push(nome); }
+    showToast(nome+' adicionado!');
+    fecharModal();
+  };
+};
 
-// ===================== RELATÓRIOS =====================
+window.gerarPDFProfissional = function(nome) {
+  const todos = [
+    ...diarias.map(d=>({...d,profissional:'Pedreiro'})),
+    ...serventes.map(d=>({...d,profissional:'Servente'})),
+    ...maodeobra
+  ];
+  const registros = todos.filter(r=>(r.profissional||'Outros')===nome).sort((a,b)=>new Date(a.data)-new Date(b.data));
+  const totalDias = registros.length;
+  const totalHoras = decimalParaHoras(registros.reduce((s,r)=>s+(r.horas||0),0));
+  const rows = registros.map((r,i)=>'<tr style="background:'+(i%2===0?'#f9f9f9':'#fff')+'"><td>'+new Date(r.data+'T00:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})+'</td><td style="text-align:center;font-weight:500">'+(r.horasFormatado||decimalParaHoras(r.horas||0))+'</td><td style="color:#666">'+(r.obs||'—')+'</td></tr>').join('');
+  const html = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>'+nome+' - Nossa Casa</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;padding:32px;color:#1a1a1a}h1{color:#1a4a3a;font-size:22px;margin-bottom:4px}.sub{color:#666;font-size:12px;margin-bottom:24px}table{width:100%;border-collapse:collapse;margin-top:16px}th{background:#1a4a3a;color:#fff;padding:9px 12px;text-align:left;font-size:12px}td{padding:8px 12px;border-bottom:1px solid #eee}.totais{margin-top:20px;background:#e8f5f0;border-radius:8px;padding:16px;display:flex;gap:32px}.tot-item .tot-label{font-size:12px;color:#666}.tot-item .tot-val{font-size:20px;font-weight:bold;color:#1a4a3a}.rodape{margin-top:32px;font-size:11px;color:#999;text-align:center}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}</style></head><body><h1>Nossa Casa — '+nome+'</h1><div class="sub">Gerado em '+new Date().toLocaleDateString('pt-BR')+'</div><table><thead><tr><th>Data</th><th style="text-align:center">Horas</th><th>Observação</th></tr></thead><tbody>'+rows+'</tbody></table><div class="totais"><div class="tot-item"><div class="tot-label">Total de dias</div><div class="tot-val">'+totalDias+'</div></div><div class="tot-item"><div class="tot-label">Total de horas</div><div class="tot-val">'+totalHoras+'</div></div></div><div class="rodape">Relatório gerado pelo app Nossa Casa</div><script>window.onload=()=>{window.print()}<\/script></body></html>';
+  const blob = new Blob([html],{type:'text/html'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href=url; a.download='nossa-casa-'+nome.toLowerCase().replace(/\s/g,'-')+'.html'; a.click();
+  URL.revokeObjectURL(url);
+  showToast('PDF gerado!');
+};
+
+// ===================== RELATÓRIOS =====================// ===================== RELATÓRIOS =====================
 function renderRelatorios() {
   const gastosDoMes = gastos.filter(g=>{
     const d = new Date(g.data+'T00:00:00');
@@ -1397,6 +1519,7 @@ function renderConfig() {
       <div class="config-item"><span class="config-label">E-mail</span><span class="config-val">${currentUser.email}</span></div>
       <div class="config-item"><span class="config-label">Total de gastos</span><span class="config-val">${gastos.length}</span></div>
       <div class="config-item"><span class="config-label">Aportes próprios</span><span class="config-val">${aportes.length}</span></div>
+      <div class="config-item"><span class="config-label">Registros mão de obra</span><span class="config-val">${diarias.length+serventes.length+maodeobra.length}</span></div>
       <div class="config-item"><span class="config-label">Etapas liberadas</span><span class="config-val">${etapas.filter(e=>e.liberado).length} / 12</span></div>
     </div>
     <div class="section-title" style="margin-top:20px">Relatório geral</div>
@@ -1708,6 +1831,10 @@ function subscribeData() {
     tarefas = snap.docs.map(d=>({id:d.id,...d.data()}));
     render();
   });
+  unsubMaodeobra = onSnapshot(collection(db,'maodeobra'), snap=>{
+    maodeobra = snap.docs.map(d=>({id:d.id,...d.data()}));
+    render();
+  });
 }
 
 // ===================== AUTH =====================
@@ -1821,6 +1948,7 @@ window.exportarBackup = async function() {
       etapas,
       diarias,
       serventes,
+      maodeobra,
       aportes,
       tarefas
     };
@@ -2172,8 +2300,8 @@ window.gerarPDFRelatorio = function() {
 
 window.gerarPDFGeral = function() {
   const s=calcSaldos(); const el=etapas.filter(e=>e.liberado).sort((a,b)=>a.numero-b.numero);
-  const tdp=diarias.length,thp=decimalParaHoras(diarias.reduce((a,d)=>a+(d.horas||0),0));
-  const tds=serventes.length,ths=decimalParaHoras(serventes.reduce((a,d)=>a+(d.horas||0),0));
+  const todosMaoGeral = [...diarias.map(d=>({...d,profissional:'Pedreiro'})),...serventes.map(d=>({...d,profissional:'Servente'})),...maodeobra];
+  const porProfGeral = {}; todosMaoGeral.forEach(r=>{const p=r.profissional||'Outros';if(!porProfGeral[p]){porProfGeral[p]={dias:0,horas:0};}porProfGeral[p].dias++;porProfGeral[p].horas+=r.horas||0;});
   const porCat={}; gastos.forEach(g=>{porCat[g.categoria]=(porCat[g.categoria]||0)+(g.valor||0);});
   const catRows=Object.entries(porCat).sort((a,b)=>b[1]-a[1]).map(([cat,val])=>{const c=getCat(cat);return `<tr><td>${c.icon} ${c.label}</td><td>${r$(val)}</td><td>${s.totalPago>0?Math.round(val/s.totalPago*100):0}%</td></tr>`;}).join('');
   const body=`<h2>Entradas</h2><div class="rg"><div class="rc green"><div class="rl">Caixa Econômica (bruto)</div><div class="rv">${r$(s.totalCaixaBruto)}</div></div><div class="rc red"><div class="rl">Taxas Caixa</div><div class="rv">${r$(s.totalTaxasEtapas)}</div></div><div class="rc green"><div class="rl">Recursos próprios</div><div class="rv">${r$(s.totalAportesProprios)}</div></div><div class="rc green"><div class="rl">Total de entradas</div><div class="rv">${r$(s.totalEntradas)}</div></div></div><h2>Saídas</h2><div class="rg"><div class="rc red"><div class="rl">Total já pago</div><div class="rv">${r$(s.totalPago)}</div></div><div class="rc red"><div class="rl">Total de taxas</div><div class="rv">${r$(s.totalTaxas)}</div></div><div class="rc amber"><div class="rl">Parcelas em aberto</div><div class="rv">${r$(s.parcelasFuturas)}</div></div><div class="rc amber"><div class="rl">Pendentes</div><div class="rv">${r$(s.totalPendente)}</div></div><div class="rc red"><div class="rl">Total comprometido</div><div class="rv">${r$(s.totalComprometido)}</div></div></div><h2>Gastos por categoria</h2><table><thead><tr><th>Categoria</th><th>Total</th><th>% do pago</th></tr></thead><tbody>${catRows}</tbody></table><h2>Etapas Caixa (${el.length} de 12 liberadas)</h2>${el.length===0?'<p style="color:#999;padding:12px 0">Nenhuma etapa liberada ainda.</p>':`<table><thead><tr><th>Etapa</th><th>Data</th><th>Bruto</th><th>Taxas</th><th>Líquido</th></tr></thead><tbody>${el.map(e=>`<tr><td>Etapa ${e.numero}</td><td>${fmtData(e.data)}</td><td>${r$(e.valorBruto||0)}</td><td>${r$(e.taxas||0)}</td><td style="color:#2d6b55;font-weight:700">${r$((e.valorBruto||0)-(e.taxas||0))}</td></tr>`).join('')}</tbody></table>`}<h2>Mão de obra</h2><div class="rg"><div class="rc"><div class="rl">👷 Pedreiro — Dias</div><div class="rv">${tdp}</div></div><div class="rc"><div class="rl">👷 Pedreiro — Horas</div><div class="rv">${thp}</div></div><div class="rc"><div class="rl">🧱 Servente — Dias</div><div class="rv">${tds}</div></div><div class="rc"><div class="rl">🧱 Servente — Horas</div><div class="rv">${ths}</div></div></div>`;
@@ -2593,60 +2721,37 @@ window.abrirMaoDeObraMes = function() {
   const anoAtual = new Date().getFullYear();
   const nomeMes = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'][mesAtual];
 
-  const diasPed = [...diarias].filter(d=>{
-    const dt=new Date(d.data+'T00:00:00');
-    return dt.getMonth()===mesAtual && dt.getFullYear()===anoAtual;
-  }).sort((a,b)=>new Date(a.data)-new Date(b.data));
+  const todos = [
+    ...diarias.map(d=>({...d,profissional:'Pedreiro'})),
+    ...serventes.map(d=>({...d,profissional:'Servente'})),
+    ...maodeobra
+  ];
+  const doMes = todos.filter(d=>{const dt=new Date(d.data+'T00:00:00');return dt.getMonth()===mesAtual&&dt.getFullYear()===anoAtual;}).sort((a,b)=>new Date(a.data)-new Date(b.data));
 
-  const diasSer = [...serventes].filter(d=>{
-    const dt=new Date(d.data+'T00:00:00');
-    return dt.getMonth()===mesAtual && dt.getFullYear()===anoAtual;
-  }).sort((a,b)=>new Date(a.data)-new Date(b.data));
+  const porProf = {};
+  doMes.forEach(r=>{const p=r.profissional||'Outros';if(!porProf[p]){porProf[p]={dias:0,horas:0,registros:[]}}porProf[p].dias++;porProf[p].horas+=r.horas||0;porProf[p].registros.push(r);});
 
-  const totalHPed = decimalParaHoras(diasPed.reduce((s,d)=>s+(d.horas||0),0));
-  const totalHSer = decimalParaHoras(diasSer.reduce((s,d)=>s+(d.horas||0),0));
+  const totalDias = doMes.length;
+  const totalHoras = decimalParaHoras(doMes.reduce((s,r)=>s+(r.horas||0),0));
 
-  const renderDias = (lista, cor, emoji) => lista.length===0
-    ? '<div style="font-size:13px;color:var(--text-muted);padding:8px 0">Nenhum registro neste mês</div>'
-    : lista.map(d=>{
-        const data = new Date(d.data+'T00:00:00').toLocaleDateString('pt-BR', {weekday:'short',day:'2-digit',month:'2-digit'});
-        return '<div class="gasto-item">'
-          +'<div class="gasto-icon" style="background:'+cor+'22">'+emoji+'</div>'
-          +'<div class="gasto-info">'
-            +'<div class="gi-cat">'+data+'</div>'
-            +(d.obs?'<div class="gi-desc">'+d.obs+'</div>':'')
-            +'<div class="gi-data">Registrado por: '+(d.quem||'')+'</div>'
-          +'</div>'
-          +'<div class="gasto-valor">'
-            +'<div class="gv-val" style="color:'+cor+'">'+d.horasFormatado+'</div>'
-            +'<div class="gv-status" style="font-size:10px;color:var(--text-hint)">horas</div>'
-          +'</div>'
-        +'</div>';
-      }).join('');
+  let linhas = '';
+  Object.entries(porProf).forEach(([prof,data])=>{
+    linhas += '<div class="section-title" style="margin-top:12px">👷 '+prof+' — '+data.dias+' dias / '+decimalParaHoras(data.horas)+' horas</div>';
+    data.registros.forEach(r=>{
+      const dateFmt = new Date(r.data+'T00:00:00').toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'2-digit'});
+      const hrs = r.horasFormatado||decimalParaHoras(r.horas||0);
+      linhas += '<div class="gasto-item"><div class="gasto-icon" style="background:var(--green-light)">👷</div><div class="gasto-info"><div class="gi-cat">'+dateFmt+'</div>'+(r.obs?'<div class="gi-desc">'+r.obs+'</div>':'')+'<div class="gi-data">Registrado por: '+(r.quem||'')+'</div></div><div class="gasto-valor"><div class="gv-val green">'+hrs+'</div></div></div>';
+    });
+  });
 
-  mc.innerHTML = `
-    <div class="modal-handle"></div>
-    <div class="modal-title">Mão de obra em ${nomeMes}</div>
-    <div class="stats-grid" style="margin-bottom:12px">
-      <div class="stat-card">
-        <div class="sc-label">👷 Pedreiro</div>
-        <div class="sc-val green">${diasPed.length} dias</div>
-        <div style="font-size:11px;color:var(--text-muted)">${totalHPed} horas</div>
-      </div>
-      <div class="stat-card">
-        <div class="sc-label">🧱 Servente</div>
-        <div class="sc-val amber">${diasSer.length} dias</div>
-        <div style="font-size:11px;color:var(--text-muted)">${totalHSer} horas</div>
-      </div>
-    </div>
-    <div class="section-title">👷 Pedreiro</div>
-    <div class="modal-scroll-list">
-      ${renderDias(diasPed, '#2d6b55', '👷')}
-      <div class="section-title" style="margin-top:12px">🧱 Servente</div>
-      ${renderDias(diasSer, '#c17f24', '🧱')}
-    </div>
-    <div class="modal-footer"><button class="btn-fechar" onclick="fecharModal()">✕ Fechar</button></div>
-  `;
+  mc.innerHTML = '<div class="modal-handle"></div>'
+    +'<div class="modal-title">Mão de obra em '+nomeMes+'</div>'
+    +'<div class="stats-grid" style="margin-bottom:12px">'
+      +'<div class="stat-card"><div class="sc-label">Total de dias</div><div class="sc-val green">'+totalDias+'</div></div>'
+      +'<div class="stat-card"><div class="sc-label">Total de horas</div><div class="sc-val green">'+totalHoras+'</div></div>'
+    +'</div>'
+    +'<div class="modal-scroll-list">'+(linhas||'<div class="empty"><p>Nenhum registro neste mês</p></div>')+'</div>'
+    +'<div class="modal-footer"><button class="btn-fechar" onclick="fecharModal()">✕ Fechar</button></div>';
   overlay.classList.add('open');
 };
 
@@ -2987,6 +3092,7 @@ window.fazerLogout = async function() {
   if(unsubServentes) unsubServentes();
   if(unsubAportes) unsubAportes();
   if(unsubTarefas) unsubTarefas();
+  if(unsubMaodeobra) unsubMaodeobra();
   await signOut(auth);
 };
 
@@ -3074,7 +3180,7 @@ function showConfirm({titulo, mensagem, confirmLabel='Confirmar', danger=false, 
 // ===================== INIT =====================
 onAuthStateChanged(auth, user=>{
   currentUser = user;
-  if(user) { subscribeData(); } else { gastos=[]; etapas=[]; diarias=[]; serventes=[]; aportes=[]; tarefas=[]; render(); }
+  if(user) { subscribeData(); } else { gastos=[]; etapas=[]; diarias=[]; serventes=[]; maodeobra=[]; aportes=[]; tarefas=[]; render(); }
 });
 
 
