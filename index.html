@@ -1219,6 +1219,75 @@ function renderEtapaItem(num, et) {
 }
 
 
+// ===================== DIÁRIAS PEDREIRO =====================
+function renderDiarias() {
+  const totalDias = diarias.length;
+  const totalHorasDec = diarias.reduce((s,d)=>s+(d.horas||0),0);
+  const totalHoras = decimalParaHoras(totalHorasDec);
+  const ordenadas = [...diarias].sort((a,b)=>new Date(b.data)-new Date(a.data));
+  return `
+    <div class="stats-grid">
+      <div class="stat-card"><div class="sc-label">Total de dias</div><div class="sc-val green">${totalDias}</div></div>
+      <div class="stat-card"><div class="sc-label">Total de horas</div><div class="sc-val green">${totalHoras}</div></div>
+    </div>
+    <button class="btn-primary" onclick="abrirModalDiaria()" style="margin-bottom:12px">+ Registrar dia trabalhado</button>
+    <button class="btn-secondary" onclick="gerarPDFPedreiro()" style="margin-bottom:12px">📄 Gerar relatório PDF</button>
+    <div class="card">
+      ${ordenadas.length===0
+        ? '<div class="empty"><div class="empty-icon">👷</div><p>Nenhum dia registrado ainda</p></div>'
+        : ordenadas.map(d=>{
+            const data = new Date(d.data+'T00:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'});
+            const hrs = d.horasFormatado||decimalParaHoras(d.horas);
+            return '<div class="gasto-item">'
+              +'<div class="gasto-icon" style="background:#e8f5f0">👷</div>'
+              +'<div class="gasto-info">'
+                +'<div class="gi-cat">'+data+'</div>'
+                +(d.obs?'<div class="gi-desc">'+d.obs+'</div>':'')
+                +'<div class="gi-data">Registrado por: '+(d.quem||'')+'</div>'
+                +'<div class="gasto-actions"><button class="btn-del" data-did="'+d.id+'" onclick="deletarDiariaById(this)">🗑️ Excluir</button></div>'
+              +'</div>'
+              +'<div class="gasto-valor"><div class="gv-val green">'+hrs+'</div></div>'
+            +'</div>';
+          }).join('')}
+    </div>
+  `;
+}
+
+// ===================== SERVENTES =====================
+function renderServentes() {
+  const totalDias = serventes.length;
+  const totalHorasDec = serventes.reduce((s,d)=>s+(d.horas||0),0);
+  const totalHoras = decimalParaHoras(totalHorasDec);
+  const ordenadas = [...serventes].sort((a,b)=>new Date(b.data)-new Date(a.data));
+  return `
+    <div class="stats-grid">
+      <div class="stat-card"><div class="sc-label">Total de dias</div><div class="sc-val" style="color:var(--amber)">${totalDias}</div></div>
+      <div class="stat-card"><div class="sc-label">Total de horas</div><div class="sc-val" style="color:var(--amber)">${totalHoras}</div></div>
+    </div>
+    <button class="btn-primary" onclick="abrirModalServente()" style="margin-bottom:12px">+ Registrar dia trabalhado</button>
+    <button class="btn-secondary" onclick="gerarPDFServente()" style="margin-bottom:12px">📄 Gerar relatório PDF</button>
+    <div class="card">
+      ${ordenadas.length===0
+        ? '<div class="empty"><div class="empty-icon">🧱</div><p>Nenhum dia registrado ainda</p></div>'
+        : ordenadas.map(d=>{
+            const data = new Date(d.data+'T00:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'});
+            const hrs = d.horasFormatado||decimalParaHoras(d.horas);
+            return '<div class="gasto-item">'
+              +'<div class="gasto-icon" style="background:#fdf3e3">🧱</div>'
+              +'<div class="gasto-info">'
+                +'<div class="gi-cat">'+data+'</div>'
+                +(d.obs?'<div class="gi-desc">'+d.obs+'</div>':'')
+                +'<div class="gi-data">Registrado por: '+(d.quem||'')+'</div>'
+                +'<div class="gasto-actions"><button class="btn-del" data-sid="'+d.id+'" onclick="deletarServenteById(this)">🗑️ Excluir</button></div>'
+              +'</div>'
+              +'<div class="gasto-valor"><div class="gv-val" style="color:var(--amber)">'+hrs+'</div></div>'
+            +'</div>';
+          }).join('')}
+    </div>
+  `;
+}
+
+
 // ===================== RELATÓRIOS =====================
 function renderRelatorios() {
   const gastosDoMes = gastos.filter(g=>{
@@ -2812,6 +2881,9 @@ window.deletarEtapaById = function(btn) {
   const id = btn.getAttribute('data-eid');
   if(id) window.deletarEtapa(id);
 };
+
+window.deletarDiariaById = function(btn) { const id=btn.getAttribute('data-did'); if(id) window.deletarDiaria(id); };
+window.deletarServenteById = function(btn) { const id=btn.getAttribute('data-sid'); if(id) window.deletarServente(id); };
 
 window.fazerLogout = async function() {
   if(unsubGastos) unsubGastos();
