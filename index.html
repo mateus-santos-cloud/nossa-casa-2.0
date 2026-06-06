@@ -1005,6 +1005,7 @@ function renderGastoItem(g, showActions=true) {
       <div class="gi-data">${data} · ${g.quem||''}</div>
       ${showActions?`<div class="gasto-actions">
         <button class="btn-edit" onclick="editarGasto('${g.id}')">✏️ Editar</button>
+        <button class="btn-edit" onclick="duplicarGasto('${g.id}')">📋 Duplicar</button>
         <button class="btn-del" onclick="deletarGasto('${g.id}')">🗑️ Excluir</button>
       </div>`:''}
     </div>
@@ -1069,7 +1070,7 @@ function renderGastos() {
     <!-- RESUMO DO PERÍODO -->
     <div class="card" style="margin-bottom:10px;padding:12px 16px">
       <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px">📊 Resumo do período</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">
         <div style="text-align:center">
           <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px">Total</div>
           <div style="font-size:14px;font-weight:700;color:var(--text)">${fmtR(totalFiltrado)}</div>
@@ -1081,6 +1082,19 @@ function renderGastos() {
         <div style="text-align:center">
           <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px">Pendente</div>
           <div style="font-size:14px;font-weight:700;color:var(--amber)">${fmtR(totalPend)}</div>
+        </div>
+      </div>
+      <div style="border-top:1px solid var(--border);padding-top:8px">
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">💳 Por forma de pagamento</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          ${(()=>{
+            const porPgto = {};
+            filtrados.forEach(g=>{ const p=g.formaPagamento||'outro'; porPgto[p]=(porPgto[p]||0)+(g.valor||0); });
+            return Object.entries(porPgto).sort((a,b)=>b[1]-a[1]).map(([pgto,val])=>{
+              const label = PAGAMENTOS.find(p=>p.id===pgto)?.label||pgto;
+              return '<div style="background:var(--green-light);border-radius:6px;padding:4px 8px;font-size:11px"><span style="color:var(--text-muted)">'+label+'</span> <strong style="color:var(--green-mid)">'+fmtR(val)+'</strong></div>';
+            }).join('');
+          })()}
         </div>
       </div>
     </div>
@@ -1199,10 +1213,22 @@ function renderEtapaItem(num, et) {
   const quem = et ? (et.quem||'—') : '—';
   const valorPrevisto = et ? (et.valorPrevisto||0) : 0;
   const etId = et ? et.id : '';
+  const prog = calcProgressoEtapa(num);
+  const tsDaEtapa2 = tarefas.filter(t=>t.etapa===num);
+  let statusVisual, statusClass;
+  if(liberado) {
+    if(prog.total>0 && prog.pct===100) { statusVisual='🏆 Concluída'; statusClass='badge-liberado'; }
+    else if(prog.pct>0) { statusVisual='🔨 Em andamento'; statusClass='badge-pendente'; }
+    else { statusVisual='✅ Liberada'; statusClass='badge-liberado'; }
+  } else {
+    if(tsDaEtapa2.length>0 && prog.pct>0) { statusVisual='🔨 Em andamento'; statusClass='badge-pendente'; }
+    else if(tsDaEtapa2.length>0) { statusVisual='📋 Planejada'; statusClass='badge-pendente'; }
+    else { statusVisual='⏳ Não iniciada'; statusClass='badge-pendente'; }
+  }
 
   if(liberado) {
     return '<div class="etapa-item">'
-      +'<div class="etapa-header"><div class="etapa-name">Etapa '+num+'</div><span class="etapa-badge badge-liberado">✅ Liberado</span></div>'
+      +'<div class="etapa-header"><div class="etapa-name">Etapa '+num+'</div><span class="etapa-badge '+statusClass+'">'+statusVisual+'</span></div>'
       +'<div class="etapa-valores">'
         +'<div class="ev-item"><div class="ev-label">Bruto</div><div class="ev-val">'+fmtR(bruto)+'</div></div>'
         +'<div class="ev-item"><div class="ev-label">Taxas</div><div class="ev-val red">-'+fmtR(taxas)+'</div></div>'
@@ -1218,7 +1244,7 @@ function renderEtapaItem(num, et) {
     +'</div>';
   } else {
     return '<div class="etapa-item">'
-      +'<div class="etapa-header"><div class="etapa-name">Etapa '+num+'</div><span class="etapa-badge badge-pendente">⏳ Pendente</span></div>'
+      +'<div class="etapa-header"><div class="etapa-name">Etapa '+num+'</div><span class="etapa-badge '+statusClass+'">'+statusVisual+'</span></div>'
       +'<div style="font-size:12px;color:var(--text-hint);margin-top:4px">Aguardando liberação da Caixa</div>'
       +(valorPrevisto>0?'<div style="font-size:12px;color:var(--amber);margin-top:4px;font-weight:500">Previsão bruta: '+fmtR(valorPrevisto)+(et&&et.taxasPrevistas?'<br><span style="font-size:11px;color:var(--red)">Taxas estimadas: '+fmtR(et.taxasPrevistas||0)+'</span><br><span style="font-size:11px;color:var(--green-mid);font-weight:600">Líquido previsto: '+fmtR((et.liquidoPrevisto||valorPrevisto))+'</span>':'')+'</div>':'')
       +'<div class="gasto-actions">'
@@ -2259,6 +2285,10 @@ window.abrirTarefasEtapa = function(num) {
         <input class="form-input" id="nova-tarefa-inicio-${num}" type="date" value="${new Date().toISOString().slice(0,10)}">
       </div>
       <div class="form-group">
+        <label class="form-label">Data prevista de conclusão (opcional)</label>
+        <input class="form-input" id="nova-tarefa-previsao-${num}" type="date">
+      </div>
+      <div class="form-group">
         <label class="form-label">Observação (opcional)</label>
         <input class="form-input" id="nova-tarefa-obs-${num}" type="text" placeholder="Detalhes...">
       </div>
@@ -2281,11 +2311,13 @@ window.adicionarTarefa = async function(etapaNum) {
   if(!nome) { showToast('Digite o nome da tarefa'); return; }
   if(!inicio) { showToast('Informe a data de início'); return; }
   try {
+    const previsaoEl = document.getElementById('nova-tarefa-previsao-'+etapaNum);
     await addDoc(collection(db,'tarefas'), {
       etapa: etapaNum,
       nome,
       obs: obsEl?.value.trim()||'',
       dataInicio: inicio,
+      dataPrevista: previsaoEl?.value||'',
       concluida: false,
       uid: currentUser.uid,
       criadoEm: new Date().toISOString()
@@ -2914,6 +2946,39 @@ window.deletarEtapaById = function(btn) {
 
 window.deletarDiariaById = function(btn) { const id=btn.getAttribute('data-did'); if(id) window.deletarDiaria(id); };
 window.deletarServenteById = function(btn) { const id=btn.getAttribute('data-sid'); if(id) window.deletarServente(id); };
+
+window.duplicarGasto = function(id) {
+  const g = gastos.find(x=>x.id===id);
+  if(!g) return;
+  showConfirm({
+    titulo: 'Duplicar gasto',
+    mensagem: 'Deseja criar uma cópia deste gasto com a data de hoje?',
+    confirmLabel: '📋 Duplicar',
+    danger: false,
+    onConfirm: async () => {
+      try {
+        const hoje = new Date().toISOString().slice(0,10);
+        const copia = {
+          valor: g.valor,
+          categoria: g.categoria,
+          descricao: g.descricao ? g.descricao + ' (cópia)' : 'Cópia',
+          data: hoje,
+          status: 'pendente',
+          formaPagamento: g.formaPagamento,
+          totalParcelas: 1,
+          parcelas: [],
+          profissional: g.profissional||'',
+          quem: currentUser.displayName||currentUser.email.split('@')[0],
+          uid: currentUser.uid,
+          criadoEm: new Date().toISOString(),
+          atualizadoEm: new Date().toISOString()
+        };
+        await addDoc(collection(db,'gastos'), copia);
+        showToast('Gasto duplicado!');
+      } catch(e) { showToast('Erro ao duplicar.'); console.error(e); }
+    }
+  });
+};
 
 window.fazerLogout = async function() {
   if(unsubGastos) unsubGastos();
