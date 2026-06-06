@@ -280,6 +280,7 @@ let editandoGasto = null;
 function render() {
   const app = document.getElementById('app');
   if (!currentUser) { app.innerHTML = renderLogin(); bindLogin(); return; }
+  try {
   app.innerHTML = `
     ${renderHeader()}
     <div id="pg-dashboard" class="page ${paginaAtual==='dashboard'?'active':''}">
@@ -325,6 +326,10 @@ function render() {
   bindEtapas();
   bindRelatorios();
   bindConfig();
+  } catch(e) {
+    console.error('RENDER ERROR:', e);
+    app.innerHTML = '<div style="padding:20px;color:red"><strong>Erro ao renderizar:</strong><br>' + e.message + '<br><pre style="font-size:11px">' + e.stack + '</pre></div>';
+  }
 }
 
 function renderHeader() {
@@ -1574,8 +1579,7 @@ function subscribeData() {
   if(unsubEtapas) unsubEtapas();
   if(unsubDiarias) unsubDiarias();
   unsubGastos = onSnapshot(collection(db,'gastos'), snap=>{
-    gastos = snap.docs.map(d=>({id:d.id,...d.data()}));
-    render();
+    try { gastos = snap.docs.map(d=>({id:d.id,...d.data()})); render(); } catch(e) { console.error('gastos snap error:', e); }
   });
   unsubEtapas = onSnapshot(collection(db,'etapas'), snap=>{
     etapas = snap.docs.map(d=>({id:d.id,...d.data()}));
