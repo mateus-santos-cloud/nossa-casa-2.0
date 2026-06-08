@@ -209,7 +209,7 @@
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, updateProfile } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, updateProfile, updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import { getFirestore, collection, addDoc, getDocs, doc, deleteDoc, updateDoc, query, where, orderBy, onSnapshot, setDoc, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 // ===================== CONFIG FIREBASE =====================
@@ -269,6 +269,7 @@ let unsubMaodeobra = null;
 let unsubAportes = null;
 let unsubTarefas = null;
 let profissionais = [...PROFISSIONAIS_PADRAO];
+let infoObra = {nome:'Nossa Casa', endereco:'', dataInicio:'', dataConclusao:''};
 let paginaAtual = 'dashboard';
 let mesRelatorio = new Date().getMonth();
 let anoRelatorio = new Date().getFullYear();
@@ -1761,29 +1762,165 @@ window.selecionarMesRelatorio = function(key) {
 // ===================== CONFIG =====================
 function renderConfig() {
   return `
-    <div class="card">
-      <div class="config-item"><span class="config-label">Usuário</span><span class="config-val">${currentUser.displayName||'—'}</span></div>
-      <div class="config-item"><span class="config-label">E-mail</span><span class="config-val">${currentUser.email}</span></div>
+    <!-- INFO DA OBRA -->
+    <div class="card" style="margin-bottom:12px">
+      <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px">🏠 Informações da obra</div>
+      <div class="config-item"><span class="config-label">Nome da obra</span><span class="config-val">${infoObra.nome||'—'}</span></div>
+      <div class="config-item"><span class="config-label">Endereço</span><span class="config-val">${infoObra.endereco||'—'}</span></div>
+      <div class="config-item"><span class="config-label">Início previsto</span><span class="config-val">${infoObra.dataInicio?new Date(infoObra.dataInicio+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</span></div>
+      <div class="config-item"><span class="config-label">Conclusão prevista</span><span class="config-val">${infoObra.dataConclusao?new Date(infoObra.dataConclusao+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</span></div>
+      <button class="btn-secondary" onclick="abrirModalInfoObra()" style="margin-top:8px;width:100%">✏️ Editar informações da obra</button>
+    </div>
+
+    <!-- CONTA -->
+    <div class="card" style="margin-bottom:12px">
+      <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px">👤 Minha conta</div>
+      <div class="config-item"><span class="config-label">Nome</span><span class="config-val">${currentUser.displayName||'—'}</span></div>
+      <div class="config-item"><span class="config-label">E-mail</span><span class="config-val" style="font-size:12px">${currentUser.email}</span></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+        <button class="btn-secondary" onclick="abrirModalEditarNome()" style="font-size:12px">✏️ Editar nome</button>
+        <button class="btn-secondary" onclick="abrirModalAlterarSenha()" style="font-size:12px">🔒 Alterar senha</button>
+      </div>
+    </div>
+
+    <!-- STATS -->
+    <div class="card" style="margin-bottom:12px">
+      <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px">📊 Estatísticas</div>
       <div class="config-item"><span class="config-label">Total de gastos</span><span class="config-val">${gastos.length}</span></div>
       <div class="config-item"><span class="config-label">Aportes próprios</span><span class="config-val">${aportes.length}</span></div>
       <div class="config-item"><span class="config-label">Registros mão de obra</span><span class="config-val">${diarias.length+serventes.length+maodeobra.length}</span></div>
       <div class="config-item"><span class="config-label">Etapas liberadas</span><span class="config-val">${etapas.filter(e=>e.liberado).length} / 12</span></div>
+      <div class="config-item"><span class="config-label">Tarefas cadastradas</span><span class="config-val">${tarefas.length}</span></div>
     </div>
-    <div class="section-title" style="margin-top:20px">Relatório geral</div>
+
+    <!-- DADOS -->
     <div class="card" style="margin-bottom:12px">
-      <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">Gera um PDF completo com todos os valores, etapas, categorias e mão de obra.</p>
-      <button class="btn-primary" onclick="gerarPDFGeral()" style="margin-top:0">📄 Gerar PDF completo</button>
+      <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px">💾 Dados</div>
+      <button class="btn-secondary" onclick="gerarPDFGeral()" style="width:100%;margin-bottom:8px">📄 Relatório geral completo</button>
+      <button class="btn-secondary" onclick="exportarBackup()" style="width:100%;margin-bottom:8px">⬇️ Exportar backup</button>
+      <button class="btn-secondary" onclick="document.getElementById('import-backup').click()" style="width:100%;margin-bottom:8px">⬆️ Restaurar backup</button>
+      <input type="file" id="import-backup" accept=".json" style="display:none" onchange="importarBackup(this)">
     </div>
-    <div class="section-title" style="margin-top:20px">Backup de dados</div>
-    <div class="card" style="margin-bottom:0">
-      <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">Exporte todos os seus dados para um arquivo de backup. Guarde em local seguro (Google Drive, WhatsApp, e-mail...).</p>
-      <button class="btn-primary" onclick="exportarBackup()" style="margin-top:0">📥 Exportar backup</button>
-      <button class="btn-secondary" onclick="document.getElementById('input-importar').click()" style="margin-top:8px">📤 Restaurar backup</button>
-      <input type="file" id="input-importar" accept=".json" style="display:none" onchange="importarBackup(event)">
-    </div>
-    <button class="btn-logout" onclick="fazerLogout()">Sair da conta</button>
+
+    <!-- LOGOUT -->
+    <button class="btn-danger" onclick="fazerLogout()" style="width:100%">Sair da conta</button>
   `;
 }
+
+window.abrirModalInfoObra = function() {
+  const overlay = document.getElementById('modal-overlay');
+  const mc = document.getElementById('modal-content');
+  mc.innerHTML = `
+    <div class="modal-handle"></div>
+    <div class="modal-title">Informações da obra</div>
+    <div class="form-group">
+      <label class="form-label">Nome da obra</label>
+      <input class="form-input" id="obra-nome" type="text" value="${infoObra.nome||''}" placeholder="Ex: Nossa Casa">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Endereço</label>
+      <input class="form-input" id="obra-end" type="text" value="${infoObra.endereco||''}" placeholder="Ex: Rua das Flores, 123">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Data de início prevista</label>
+      <input class="form-input" id="obra-inicio" type="date" value="${infoObra.dataInicio||''}">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Data de conclusão prevista</label>
+      <input class="form-input" id="obra-conclusao" type="date" value="${infoObra.dataConclusao||''}">
+    </div>
+    <button class="btn-primary" id="btn-salvar-obra">Salvar</button>
+    <button class="btn-secondary" onclick="fecharModal()">Cancelar</button>
+  `;
+  overlay.classList.add('open');
+  document.getElementById('btn-salvar-obra').onclick = async () => {
+    const nome = document.getElementById('obra-nome').value.trim()||'Nossa Casa';
+    const endereco = document.getElementById('obra-end').value.trim();
+    const dataInicio = document.getElementById('obra-inicio').value;
+    const dataConclusao = document.getElementById('obra-conclusao').value;
+    try {
+      await setDoc(doc(db,'config','infoObra'), {nome, endereco, dataInicio, dataConclusao, uid: currentUser.uid});
+      infoObra = {nome, endereco, dataInicio, dataConclusao};
+      showToast('Informações salvas!');
+      fecharModal();
+      render();
+    } catch(e) { showToast('Erro ao salvar.'); console.error(e); }
+  };
+};
+
+window.abrirModalEditarNome = function() {
+  const overlay = document.getElementById('modal-overlay');
+  const mc = document.getElementById('modal-content');
+  mc.innerHTML = `
+    <div class="modal-handle"></div>
+    <div class="modal-title">Editar nome</div>
+    <div class="form-group">
+      <label class="form-label">Seu nome</label>
+      <input class="form-input" id="edit-nome-user" type="text" value="${currentUser.displayName||''}" placeholder="Como quer ser identificado nos registros">
+    </div>
+    <button class="btn-primary" id="btn-salvar-nome">Salvar</button>
+    <button class="btn-secondary" onclick="fecharModal()">Cancelar</button>
+  `;
+  overlay.classList.add('open');
+  document.getElementById('btn-salvar-nome').onclick = async () => {
+    const nome = document.getElementById('edit-nome-user').value.trim();
+    if(!nome) { showToast('Digite seu nome'); return; }
+    try {
+      await updateProfile(currentUser, {displayName: nome});
+      showToast('Nome atualizado!');
+      fecharModal();
+      render();
+    } catch(e) { showToast('Erro ao atualizar.'); console.error(e); }
+  };
+};
+
+window.abrirModalAlterarSenha = function() {
+  const overlay = document.getElementById('modal-overlay');
+  const mc = document.getElementById('modal-content');
+  mc.innerHTML = `
+    <div class="modal-handle"></div>
+    <div class="modal-title">Alterar senha</div>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">Por segurança, confirme sua senha atual antes de criar uma nova.</div>
+    <div class="form-group">
+      <label class="form-label">Senha atual</label>
+      <input class="form-input" id="senha-atual" type="password" placeholder="••••••••">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Nova senha</label>
+      <input class="form-input" id="senha-nova" type="password" placeholder="Mínimo 6 caracteres">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Confirmar nova senha</label>
+      <input class="form-input" id="senha-conf" type="password" placeholder="Repita a nova senha">
+    </div>
+    <button class="btn-primary" id="btn-salvar-senha">Alterar senha</button>
+    <button class="btn-secondary" onclick="fecharModal()">Cancelar</button>
+  `;
+  overlay.classList.add('open');
+  document.getElementById('btn-salvar-senha').onclick = async () => {
+    const atual = document.getElementById('senha-atual').value;
+    const nova = document.getElementById('senha-nova').value;
+    const conf = document.getElementById('senha-conf').value;
+    if(!atual||!nova||!conf) { showToast('Preencha todos os campos'); return; }
+    if(nova.length < 6) { showToast('Nova senha deve ter pelo menos 6 caracteres'); return; }
+    if(nova !== conf) { showToast('As senhas não conferem'); return; }
+    try {
+      const cred = EmailAuthProvider.credential(currentUser.email, atual);
+      await reauthenticateWithCredential(currentUser, cred);
+      await updatePassword(currentUser, nova);
+      showToast('Senha alterada com sucesso!');
+      fecharModal();
+    } catch(e) {
+      if(e.code==='auth/wrong-password'||e.code==='auth/invalid-credential') {
+        showToast('Senha atual incorreta');
+      } else {
+        showToast('Erro ao alterar senha');
+        console.error(e);
+      }
+    }
+  };
+};
+
 
 // ===================== MODAIS =====================
 window.abrirModalGasto = function(id) {
@@ -2082,6 +2219,8 @@ function subscribeData() {
     maodeobra = snap.docs.map(d=>({id:d.id,...d.data()}));
     render();
   });
+  // Load infoObra
+  getDoc(doc(db,'config','infoObra')).then(d=>{ if(d.exists()) { infoObra={...infoObra,...d.data()}; render(); } }).catch(()=>{});
 }
 
 // ===================== AUTH =====================
