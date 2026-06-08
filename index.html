@@ -1310,42 +1310,188 @@ function renderMaodeobra() {
   `;
 }
 
-window.abrirDetalhesProfissional = function(nome) {
+window.abrirDetalhesProfissional = function(nome, limite, filtroPer) {
+  limite = limite || 10;
+  filtroPer = filtroPer || 'todos';
+
   const overlay = document.getElementById('modal-overlay');
   const mc = document.getElementById('modal-content');
+
   const todos = [
     ...diarias.map(d=>({...d,profissional:'Pedreiro',_col:'diarias'})),
     ...serventes.map(d=>({...d,profissional:'Servente',_col:'serventes'})),
-    ...maodeobra
+    ...maodeobra.map(d=>({...d,_col:'maodeobra'}))
   ];
-  const registros = todos.filter(r=>(r.profissional||'Outros')===nome).sort((a,b)=>new Date(b.data)-new Date(a.data));
-  const totalHoras = decimalParaHoras(registros.reduce((s,r)=>s+(r.horas||0),0));
+  let registros = todos.filter(r=>(r.profissional||'Outros')===nome);
 
-  const linhas = registros.map(r=>{
-    const data = new Date(r.data+'T00:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'});
-    const hrs = r.horasFormatado||decimalParaHoras(r.horas||0);
-    return '<div class="gasto-item">'
-      +'<div class="gasto-icon" style="background:var(--green-light)">👷</div>'
-      +'<div class="gasto-info">'
-        +'<div class="gi-cat">'+data+'</div>'
-        +(r.obs?'<div class="gi-desc">'+r.obs+'</div>':'')
-        +'<div class="gi-data">Registrado por: '+(r.quem||'')+'</div>'
-        +'<div class="gasto-actions"><button class="btn-del" data-rid="'+r.id+'" data-col="'+(r._col||'maodeobra')+'" onclick="deletarRegistroMao(this)">🗑️ Excluir</button></div>'
-      +'</div>'
-      +'<div class="gasto-valor"><div class="gv-val green">'+hrs+'</div></div>'
-    +'</div>';
-  }).join('');
+  // Filter by period
+  if(filtroPer !== 'todos') {
+    const parts = filtroPer.split('-').map(Number);
+    registros = registros.filter(r=>{
+      const d = new Date(r.data+'T00:00:00');
+      return d.getFullYear()===parts[0] && d.getMonth()===(parts[1]-1);
+    });
+  }
+
+  registros.sort((a,b)=>new Date(b.data)-new Date(a.data));
+
+  // All registros for period options and monthly summary
+  const todosDoProf = todos.filter(r=>(r.profissional||'Outros')===nome);
+  const totalHorasTodas = decimalParaHoras(todosDoProf.reduce((s,r)=>s+(r.horas||0),0));
+
+  // Build period options
+  const periodos = {};
+  todosDoProf.forEach(r=>{
+    if(!r.data) return;
+    const d = new Date(r.data+'T00:00:00');
+    const key = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    periodos[key] = MESES[d.getMonth()]+' '+d.getFullYear();
+  });
+  let periodoOpts = '<option value="todos">Todos os meses</option>';
+  Object.entries(periodos).sort((a,b)=>b[0].localeCompare(a[0])).forEach(function(e){
+    periodoOpts += '<option value="'+e[0]+'" '+(filtroPer===e[0]?'selected':'')+'>'+e[1]+'</option>';
+  });
+
+  // Monthly summary
+  const porMes = {};
+  todosDoProf.forEach(r=>{
+    if(!r.data) return;
+    const d = new Date(r.data+'T00:00:00');
+    const key = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    const label = MESES[d.getMonth()]+' '+d.getFullYear();
+    if(!porMes[key]) porMes[key] = {label, dias:0, horas:0};
+    porMes[key].dias++;
+    porMes[key].horas += r.horas||0;
+  });
+  const resumoMensal = Object.entries(porMes).sort((a,b)=>b[0].localeCompare(a[0])).map(([k,v])=>
+    '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px">'
+      +'<span style="color:var(--text-muted)">'+v.label+'</span>'
+      +'<span style="font-weight:500">'+v.dias+' dias · '+decimalParaHoras(v.horas)+'</span>'
+    +'</div>'
+  ).join('');
+
+  // Filtered totals
+  const totalHorasFiltrado = decimalParaHoras(registros.reduce((s,r)=>s+(r.horas||0),0));
+  const visiveis = registros.slice(0, limite);
+  const temMais = registros.length > limite;
+
+  // Build list
+  let linhas = '';
+  if(visiveis.length===0) {
+    linhas = '<div class="empty"><div class="empty-icon">📅</div><p>Nenhum registro encontrado</p></div>';
+  } else {
+    visiveis.forEach(function(r) {
+      const data = new Date(r.data+'T00:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'});
+      const hrs = r.horasFormatado||decimalParaHoras(r.horas||0);
+      linhas += '<div class="gasto-item">'
+        +'<div class="gasto-icon" style="background:var(--green-light)">👷</div>'
+        +'<div class="gasto-info">'
+          +'<div class="gi-cat">'+data+'</div>'
+          +(r.obs?'<div class="gi-desc">'+r.obs+'</div>':'')
+          +'<div class="gi-data">Registrado por: '+(r.quem||'')+'</div>'
+          +'<div class="gasto-actions">'
+            +'<button class="btn-edit" data-rid="'+r.id+'" data-col="'+(r._col||'maodeobra')+'" onclick="editarRegistroMao(this)">✏️ Editar</button>'
+            +'<button class="btn-del" data-rid="'+r.id+'" data-col="'+(r._col||'maodeobra')+'" onclick="deletarRegistroMao(this)">🗑️ Excluir</button>'
+          +'</div>'
+        +'</div>'
+        +'<div class="gasto-valor"><div class="gv-val green">'+hrs+'</div></div>'
+      +'</div>';
+    });
+    if(temMais) {
+      +'<div id="btn-load-more" data-limite="'+(limite+10)+'" style="text-align:center;padding:10px;border:1px dashed var(--border);border-radius:8px;margin:8px 0;cursor:pointer;font-size:13px;color:var(--text-muted)">↓ Carregar mais 10 ('+(registros.length-limite)+' restantes)</div>'
+    }
+  }
 
   mc.innerHTML = '<div class="modal-handle"></div>'
     +'<div class="modal-title">👷 '+nome+'</div>'
+    // Summary cards
     +'<div class="stats-grid" style="margin-bottom:12px">'
-      +'<div class="stat-card"><div class="sc-label">Total de dias</div><div class="sc-val green">'+registros.length+'</div></div>'
-      +'<div class="stat-card"><div class="sc-label">Total de horas</div><div class="sc-val green">'+totalHoras+'</div></div>'
+      +'<div class="stat-card"><div class="sc-label">Total de dias</div><div class="sc-val green">'+todosDoProf.length+'</div></div>'
+      +'<div class="stat-card"><div class="sc-label">Total de horas</div><div class="sc-val green">'+totalHorasTodas+'</div></div>'
     +'</div>'
-    +'<button onclick="gerarPDFProfissional('+JSON.stringify(nome)+')" style="width:100%;background:var(--green-light);color:var(--green);border:none;border-radius:8px;padding:10px;font-family:DM Sans,sans-serif;font-size:13px;font-weight:500;cursor:pointer;margin-bottom:12px">📄 Gerar PDF</button>'
-    +'<div class="modal-scroll-list">'+(linhas||'<div class="empty"><p>Nenhum registro</p></div>')+'</div>'
+    // Monthly summary (collapsible)
+    +'<details style="margin-bottom:12px"><summary style="cursor:pointer;font-size:13px;font-weight:500;color:var(--green-mid);padding:8px 0">📊 Resumo mensal</summary>'
+      +'<div class="card" style="margin-top:8px;padding:8px 12px">'+(resumoMensal||'<p style="color:#999;font-size:13px">Nenhum registro</p>')+'</div>'
+    +'</details>'
+    // PDF button
+    +'<button data-pnome="'+nome+'" onclick="gerarPDFProfissionalById(this)" style="width:100%;background:var(--green-light);color:var(--green);border:none;border-radius:8px;padding:10px;font-family:DM Sans,sans-serif;font-size:13px;font-weight:500;cursor:pointer;margin-bottom:12px">📄 Gerar PDF</button>'
+    // Period filter
+    +'<div style="display:grid;grid-template-columns:1fr auto;gap:8px;margin-bottom:12px">'
+      +'<select class="form-input" id="det-periodo" style="padding:8px 10px;font-size:13px">'+periodoOpts+'</select>'
+    +'<button id="btn-det-filtrar" style="background:var(--green);color:#fff;border:none;border-radius:8px;padding:0 14px;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap">🔍 Filtrar</button>'
+    +'</div>'
+    // Results info
+    +(filtroPer!=='todos'?'<div style="background:var(--green-light);border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:12px;color:var(--green-mid)">'+registros.length+' registro'+(registros.length!==1?'s':'')+' · '+totalHorasFiltrado+' horas</div>':'')
+    // List
+    +'<div class="modal-scroll-list">'+linhas+'</div>'
     +'<div class="modal-footer"><button class="btn-fechar" onclick="fecharModal()">✕ Fechar</button></div>';
+
   overlay.classList.add('open');
+
+  window._detNome = nome;
+  window._detPer = filtroPer;
+
+  // Bind buttons after render
+  const btnFiltrar = document.getElementById('btn-det-filtrar');
+  if(btnFiltrar) btnFiltrar.onclick = function() {
+    const per = document.getElementById('det-periodo')?.value || 'todos';
+    abrirDetalhesProfissional(nome, 10, per);
+  };
+  const btnMore = document.getElementById('btn-load-more');
+  if(btnMore) btnMore.onclick = function() {
+    const novoLimite = parseInt(btnMore.getAttribute('data-limite'))||20;
+    abrirDetalhesProfissional(nome, novoLimite, filtroPer);
+  };
+};
+
+
+window.editarRegistroMao = function(btn) {
+  const id = btn.getAttribute('data-rid');
+  const col = btn.getAttribute('data-col');
+  // Find the record
+  const allRecs = [
+    ...diarias.map(d=>({...d,_col:'diarias'})),
+    ...serventes.map(d=>({...d,_col:'serventes'})),
+    ...maodeobra.map(d=>({...d,_col:'maodeobra'}))
+  ];
+  const r = allRecs.find(x=>x.id===id);
+  if(!r) { showToast('Registro não encontrado'); return; }
+
+  const overlay = document.getElementById('modal-overlay');
+  const mc = document.getElementById('modal-content');
+  mc.innerHTML = `
+    <div class="modal-handle"></div>
+    <div class="modal-title">Editar registro</div>
+    <div class="form-group">
+      <label class="form-label">Data</label>
+      <input class="form-input" id="edit-mao-data" type="date" value="${r.data||''}">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Horas trabalhadas (ex: 8:00 ou 7:30)</label>
+      <input class="form-input" id="edit-mao-horas" type="text" inputmode="text" value="${r.horasFormatado||decimalParaHoras(r.horas||0)}">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Observação (opcional)</label>
+      <input class="form-input" id="edit-mao-obs" type="text" value="${r.obs||''}">
+    </div>
+    <button class="btn-primary" id="btn-salvar-edit-mao">Salvar alterações</button>
+    <button class="btn-secondary" onclick="fecharModal();setTimeout(()=>abrirDetalhesProfissional(window._detNome,10,window._detPer),200)">Cancelar</button>
+  `;
+  overlay.classList.add('open');
+  document.getElementById('btn-salvar-edit-mao').onclick = async () => {
+    const data = document.getElementById('edit-mao-data').value;
+    const horasRaw = document.getElementById('edit-mao-horas').value.trim();
+    const horas = horasParaDecimal(horasRaw);
+    const horasFormatado = decimalParaHoras(horas);
+    const obs = document.getElementById('edit-mao-obs').value.trim();
+    if(!data||!horas) { showToast('Preencha data e horas'); return; }
+    try {
+      await updateDoc(doc(db,col,id), {data, horas, horasFormatado, obs});
+      showToast('Registro atualizado!');
+      fecharModal();
+      setTimeout(()=>abrirDetalhesProfissional(window._detNome,10,window._detPer), 200);
+    } catch(e) { showToast('Erro ao salvar.'); console.error(e); }
+  };
 };
 
 window.deletarRegistroMao = function(btn) {
@@ -1357,7 +1503,7 @@ window.deletarRegistroMao = function(btn) {
     confirmLabel: 'Excluir',
     danger: true,
     onConfirm: async () => {
-      try { await deleteDoc(doc(db,col,id)); showToast('Registro excluído!'); fecharModal(); } catch(e){ showToast('Erro ao excluir.'); }
+      try { await deleteDoc(doc(db,col,id)); showToast('Registro excluído!'); fecharModal(); setTimeout(()=>abrirDetalhesProfissional(window._detNome,10,window._detPer),300); } catch(e){ showToast('Erro ao excluir.'); }
     }
   });
 };
@@ -3091,6 +3237,11 @@ window.duplicarGasto = function(id) {
 window.abrirDetalhesProfissionalById = function(el) {
   const nome = el.getAttribute('data-prof');
   if(nome) window.abrirDetalhesProfissional(nome);
+};
+
+window.gerarPDFProfissionalById = function(btn) {
+  const nome = btn.getAttribute('data-pnome');
+  if(nome) window.gerarPDFProfissional(nome);
 };
 
 window.fazerLogout = async function() {
