@@ -1603,62 +1603,160 @@ function renderRelatorios() {
     const d = new Date(g.data+'T00:00:00');
     return d.getMonth()===mesRelatorio && d.getFullYear()===anoRelatorio;
   });
-  const totalMes = gastosDoMes.filter(g=>g.status==='pago').reduce((s,g)=>s+(g.valor||0),0);
-  const totalPendMes = gastosDoMes.filter(g=>g.status==='pendente').reduce((s,g)=>s+(g.valor||0),0);
-  
-  const porCategoria = {};
-  gastosDoMes.forEach(g=>{ porCategoria[g.categoria]=(porCategoria[g.categoria]||0)+(g.valor||0); });
-  const maxCat = Math.max(...Object.values(porCategoria), 1);
+  const totalMes = gastosDoMes.reduce((s,g)=>s+(g.valor||0),0);
+  const pagoMes = gastosDoMes.filter(g=>g.status==='pago').reduce((s,g)=>s+(g.valor||0),0);
+  const pendMes = gastosDoMes.filter(g=>g.status==='pendente').reduce((s,g)=>s+(g.valor||0),0);
 
-  const historico = calcHistorico();
+  // ---- GASTOS POR MÊS (bar chart) ----
+  const porMes = {};
+  gastos.forEach(g=>{
+    if(!g.data) return;
+    const d = new Date(g.data+'T00:00:00');
+    const key = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    if(!porMes[key]) porMes[key]={label:MESES[d.getMonth()].slice(0,3)+'/'+String(d.getFullYear()).slice(2),total:0};
+    porMes[key].total += g.valor||0;
+  });
+  const mesesOrdenados = Object.entries(porMes).sort((a,b)=>a[0].localeCompare(b[0]));
+  const maxMes = Math.max(...mesesOrdenados.map(([,v])=>v.total), 1);
+  const barrasMes = mesesOrdenados.map(([key,v])=>{
+    const pct = Math.round(v.total/maxMes*100);
+    const ativo = key === (anoRelatorio+'-'+String(mesRelatorio+1).padStart(2,'0'));
+    return '<div style="display:flex;flex-direction:column;align-items:center;min-width:36px;cursor:pointer" data-mkey="'+key+'" onclick="selecionarMesByEl(this)">'
+      +'<div style="font-size:10px;color:var(--text-muted);margin-bottom:4px">'+fmtR(v.total).replace('R$ ','').replace(',00','')+'</div>'
+      +'<div style="width:28px;background:'+(ativo?'var(--green)':'var(--green-light)')+';border-radius:4px 4px 0 0;height:'+Math.max(pct*80/100,4)+'px;transition:height 0.3s"></div>'
+      +'<div style="font-size:10px;color:'+(ativo?'var(--green)':'var(--text-muted)')+';margin-top:4px;font-weight:'+(ativo?'700':'400')+'">'+v.label+'</div>'
+    +'</div>';
+  }).join('');
+
+  // ---- GASTOS POR CATEGORIA ----
+  const porCat = {};
+  gastos.forEach(g=>{ porCat[g.categoria]=(porCat[g.categoria]||0)+(g.valor||0); });
+  const totalGeral = Object.values(porCat).reduce((s,v)=>s+v,0)||1;
+  const catOrdenadas = Object.entries(porCat).sort((a,b)=>b[1]-a[1]);
+  const barrasCat = catOrdenadas.map(([cat,val])=>{
+    const c = getCat(cat);
+    const pct = Math.round(val/totalGeral*100);
+    return '<div style="margin-bottom:10px">'
+      +'<div style="display:flex;justify-content:space-between;margin-bottom:3px">'
+        +'<span style="font-size:12px">'+c.icon+' '+c.label+'</span>'
+        +'<span style="font-size:12px;font-weight:500">'+fmtR(val)+' <span style="color:var(--text-muted);font-weight:400">('+pct+'%)</span></span>'
+      +'</div>'
+      +'<div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden">'
+        +'<div style="height:100%;width:'+pct+'%;background:var(--green-accent);border-radius:4px;transition:width 0.5s"></div>'
+      +'</div>'
+    +'</div>';
+  }).join('');
+
+  // ---- ENTRADAS VS SAÍDAS ----
+  const s = calcSaldos();
+  const saldo = s.totalEntradas - s.totalPago;
+  const pctUsado = s.totalEntradas>0 ? Math.round(s.totalPago/s.totalEntradas*100) : 0;
+
+  // ---- MÊS SELECTOR ----
+  const mesesDisponiveis = {};
+  gastos.forEach(g=>{
+    if(!g.data) return;
+    const d = new Date(g.data+'T00:00:00');
+    const key = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    mesesDisponiveis[key] = {mes:d.getMonth(), ano:d.getFullYear()};
+  });
+  const mesesOpts = Object.entries(mesesDisponiveis).sort((a,b)=>b[0].localeCompare(a[0])).map(([key,v])=>
+    '<option value="'+key+'" '+(mesRelatorio===v.mes&&anoRelatorio===v.ano?'selected':'')+'>'+MESES[v.mes]+' '+v.ano+'</option>'
+  ).join('');
+
+  // ---- CAT TABLE FOR MONTH ----
+  const porCatMes = {};
+  gastosDoMes.forEach(g=>{ porCatMes[g.categoria]=(porCatMes[g.categoria]||0)+(g.valor||0); });
+  const catMesRows = Object.entries(porCatMes).sort((a,b)=>b[1]-a[1]).map(([cat,val])=>{
+    const c=getCat(cat); const pct=totalMes>0?Math.round(val/totalMes*100):0;
+    return '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px">'
+      +'<span>'+c.icon+' '+c.label+'</span>'
+      +'<span style="font-weight:500">'+fmtR(val)+' <span style="color:var(--text-muted);font-size:11px">('+pct+'%)</span></span>'
+    +'</div>';
+  }).join('');
 
   return `
-    <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
-      <button onclick="gerarPDFRelatorio()" style="background:var(--green-light);color:var(--green);border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif">📄 Gerar PDF do mês</button>
+    <!-- ENTRADAS VS SAÍDAS -->
+    <div class="card" style="margin-bottom:12px">
+      <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px">⚖️ Entradas vs Saídas</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">
+        <div style="text-align:center">
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px">Entradas</div>
+          <div style="font-size:13px;font-weight:700;color:var(--green-mid)">${fmtR(s.totalEntradas)}</div>
+        </div>
+        <div style="text-align:center;border-left:1px solid var(--border);border-right:1px solid var(--border)">
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px">Saídas</div>
+          <div style="font-size:13px;font-weight:700;color:var(--red)">${fmtR(s.totalPago)}</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px">Saldo</div>
+          <div style="font-size:13px;font-weight:700;color:${saldo>=0?'var(--green-mid)':'var(--red)'}">${fmtR(Math.abs(saldo))}</div>
+        </div>
+      </div>
+      <div style="height:10px;background:var(--border);border-radius:5px;overflow:hidden;margin-bottom:4px">
+        <div style="height:100%;width:${Math.min(pctUsado,100)}%;background:${pctUsado>90?'var(--red)':pctUsado>70?'var(--amber)':'var(--green-accent)'};border-radius:5px;transition:width 0.5s"></div>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);text-align:right">${pctUsado}% das entradas comprometidas</div>
     </div>
-    <div class="mes-selector">
-      <button class="mes-nav" id="btn-mes-prev">‹</button>
-      <div class="mes-atual">${MESES[mesRelatorio]} ${anoRelatorio}</div>
-      <button class="mes-nav" id="btn-mes-next">›</button>
+
+    <!-- GASTOS POR MÊS -->
+    <div class="card" style="margin-bottom:12px">
+      <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:12px">📅 Gastos por mês</div>
+      ${mesesOrdenados.length===0
+        ? '<p style="color:var(--text-muted);font-size:13px">Nenhum gasto registrado</p>'
+        : '<div style="display:flex;align-items:flex-end;gap:4px;overflow-x:auto;padding-bottom:4px;min-height:100px">'+barrasMes+'</div>'
+      }
     </div>
-    <div class="stats-grid">
-      <div class="stat-card"><div class="sc-label">Pago no mês</div><div class="sc-val red">${fmtR(totalMes)}</div></div>
-      <div class="stat-card"><div class="sc-label">Pendente no mês</div><div class="sc-val amber">${fmtR(totalPendMes)}</div></div>
+
+    <!-- GASTOS POR CATEGORIA -->
+    <div class="card" style="margin-bottom:12px">
+      <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px">🏷️ Gastos por categoria (geral)</div>
+      ${catOrdenadas.length===0
+        ? '<p style="color:var(--text-muted);font-size:13px">Nenhum gasto registrado</p>'
+        : barrasCat
+      }
     </div>
-    <div class="section-title">Por categoria</div>
-    <div class="card">
-      ${Object.keys(porCategoria).length===0?`<div class="empty"><div class="empty-icon">📊</div><p>Sem gastos neste mês</p></div>`:
-        Object.entries(porCategoria).sort((a,b)=>b[1]-a[1]).map(([cat,val])=>{
-          const c = getCat(cat);
-          return `<div class="cat-bar">
-            <div class="cat-bar-header"><span>${c.icon} ${c.label}</span><span>${fmtR(val)}</span></div>
-            <div class="cat-bar-track"><div class="cat-bar-fill" style="width:${Math.round(val/maxCat*100)}%;background:${c.cor}"></div></div>
-          </div>`;
-        }).join('')}
+
+    <!-- RELATÓRIO MENSAL -->
+    <div class="section-title" style="margin-top:4px">Relatório mensal</div>
+    <div style="display:grid;grid-template-columns:1fr auto;gap:8px;margin-bottom:12px">
+      <select class="form-input" id="sel-mes-rel" style="padding:8px 10px;font-size:13px">
+        ${mesesOpts}
+      </select>
+      <button onclick="aplicarMesRelatorio()" style="background:var(--green);color:#fff;border:none;border-radius:8px;padding:0 14px;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap">Ver</button>
     </div>
-    <div class="section-title">Histórico mensal</div>
-    <div class="card">
-      ${historico.length===0?`<div class="empty"><div class="empty-icon">📅</div><p>Sem histórico ainda</p></div>`:
-        historico.map(h=>`<div class="gasto-item" style="cursor:pointer" onclick="irParaMes(${h.mes},${h.ano})">
-          <div class="gasto-icon" style="background:#e8f5f0">📅</div>
-          <div class="gasto-info"><div class="gi-cat">${MESES[h.mes]} ${h.ano}</div><div class="gi-desc">${h.qtd} lançamento${h.qtd!==1?'s':''}</div></div>
-          <div class="gasto-valor"><div class="gv-val">${fmtR(h.total)}</div></div>
-        </div>`).join('')}
+    <div class="card" style="margin-bottom:8px;padding:12px 16px">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:${catMesRows?'10px':'0'}">
+        <div style="text-align:center"><div style="font-size:11px;color:var(--text-muted);margin-bottom:2px">Total</div><div style="font-size:13px;font-weight:700">${fmtR(totalMes)}</div></div>
+        <div style="text-align:center;border-left:1px solid var(--border);border-right:1px solid var(--border)"><div style="font-size:11px;color:var(--text-muted);margin-bottom:2px">Pago</div><div style="font-size:13px;font-weight:700;color:var(--green-mid)">${fmtR(pagoMes)}</div></div>
+        <div style="text-align:center"><div style="font-size:11px;color:var(--text-muted);margin-bottom:2px">Pendente</div><div style="font-size:13px;font-weight:700;color:var(--amber)">${fmtR(pendMes)}</div></div>
+      </div>
+      ${catMesRows?'<div style="border-top:1px solid var(--border);padding-top:8px">'+catMesRows+'</div>':''}
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn-primary" style="flex:1;margin-bottom:0" onclick="gerarPDFRelatorio()">📄 PDF do mês</button>
     </div>
   `;
 }
 
-function calcHistorico() {
-  const mapa = {};
-  gastos.forEach(g=>{
-    const d = new Date(g.data+'T00:00:00');
-    const key = `${d.getFullYear()}-${d.getMonth()}`;
-    if(!mapa[key]) mapa[key]={mes:d.getMonth(),ano:d.getFullYear(),total:0,qtd:0};
-    mapa[key].total += g.valor||0;
-    mapa[key].qtd++;
-  });
-  return Object.values(mapa).sort((a,b)=>b.ano-a.ano||b.mes-a.mes);
-}
+window.aplicarMesRelatorio = function() {
+  const sel = document.getElementById('sel-mes-rel');
+  if(!sel) return;
+  const parts = sel.value.split('-').map(Number);
+  anoRelatorio = parts[0];
+  mesRelatorio = parts[1]-1;
+  render();
+};
+
+window.selecionarMesRelatorio = function(key) {
+  const parts = key.split('-').map(Number);
+  anoRelatorio = parts[0];
+  mesRelatorio = parts[1]-1;
+  render();
+  // Scroll to relatorios section
+  setTimeout(()=>{ const el=document.getElementById('sel-mes-rel'); if(el) el.scrollIntoView({behavior:'smooth',block:'center'}); },100);
+};
+
 
 // ===================== CONFIG =====================
 function renderConfig() {
@@ -3242,6 +3340,11 @@ window.abrirDetalhesProfissionalById = function(el) {
 window.gerarPDFProfissionalById = function(btn) {
   const nome = btn.getAttribute('data-pnome');
   if(nome) window.gerarPDFProfissional(nome);
+};
+
+window.selecionarMesByEl = function(el) {
+  const key = el.getAttribute('data-mkey');
+  if(key) window.selecionarMesRelatorio(key);
 };
 
 window.fazerLogout = async function() {
