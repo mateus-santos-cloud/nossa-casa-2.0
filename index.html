@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<meta name="theme-color" content="#1a4a3a">
+<meta name="theme-color" content="#5c3d1e">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Nossa Casa">
@@ -368,28 +368,28 @@ function gerarPDF(titulo, htmlBody) {
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
     body{font-family:'Segoe UI',Arial,sans-serif;background:#fff;color:#1a1a1a}
-    .header{background:#1a4a3a;color:#fff;padding:28px 32px 20px}
+    .header{background:#5c3d1e;color:#fff;padding:28px 32px 20px}
     .header h1{font-size:22px;font-weight:600}
     .htitulo{font-size:16px;font-weight:500;margin-top:6px}
     .sub{font-size:12px;opacity:0.7;margin-top:4px}
     .content{padding:24px 32px}
-    h2{font-size:12px;font-weight:700;color:#1a4a3a;text-transform:uppercase;letter-spacing:1px;margin:24px 0 10px;padding-bottom:6px;border-bottom:2px solid #e8f5f0}
+    h2{font-size:12px;font-weight:700;color:#5c3d1e;text-transform:uppercase;letter-spacing:1px;margin:24px 0 10px;padding-bottom:6px;border-bottom:2px solid #e8f5f0}
     h2:first-child{margin-top:0}
     .rg{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:20px}
-    .rc{background:#f7f5f0;border-radius:8px;padding:12px 14px;border-left:3px solid #1a4a3a}
+    .rc{background:#f5ede4;border-radius:8px;padding:12px 14px;border-left:3px solid #5c3d1e}
     .rc.red{border-left-color:#b33a3a}.rc.amber{border-left-color:#c17f24}.rc.green{border-left-color:#2d6b55}
     .rl{font-size:11px;color:#666;margin-bottom:3px}
     .rv{font-size:16px;font-weight:700;color:#1a1a1a}
     .rc.red .rv{color:#b33a3a}.rc.amber .rv{color:#c17f24}.rc.green .rv{color:#2d6b55}
     table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px}
-    thead th{background:#1a4a3a;color:#fff;padding:9px 10px;text-align:left;font-size:11px;font-weight:600;letter-spacing:0.3px}
+    thead th{background:#5c3d1e;color:#fff;padding:9px 10px;text-align:left;font-size:11px;font-weight:600;letter-spacing:0.3px}
     tbody td{padding:8px 10px;border-bottom:1px solid #f0ede8;vertical-align:top}
     tbody tr:last-child td{border-bottom:none}
     tbody tr:nth-child(even) td{background:#fafaf8}
     .tg{display:inline-block;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:600}
     .tg.pago{background:#e8f5f0;color:#2d6b55}.tg.pendente{background:#fdf3e3;color:#c17f24}
-    .tr td{background:#e8f5f0 !important;font-weight:700;border-top:2px solid #ccc;color:#1a4a3a}
-    .rodape{background:#f7f5f0;padding:12px 32px;font-size:10px;color:#999;display:flex;justify-content:space-between;margin-top:24px;border-top:1px solid #e0ddd6}
+    .tr td{background:#e8f5f0 !important;font-weight:700;border-top:2px solid #ccc;color:#5c3d1e}
+    .rodape{background:#f5ede4;padding:12px 32px;font-size:10px;color:#999;display:flex;justify-content:space-between;margin-top:24px;border-top:1px solid #e0ddd6}
     @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
   </style></head><body>
   <div class="header"><h1>Nossa Casa</h1><div class="htitulo">${titulo}</div><div class="sub">Gerado em ${hoje}</div></div>
@@ -1168,11 +1168,11 @@ function renderEtapas() {
         </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <div style="background:#f7f5f0;border-radius:8px;padding:10px;border-left:3px solid var(--green-mid)">
+        <div style="background:#f5ede4;border-radius:8px;padding:10px;border-left:3px solid var(--green-mid)">
           <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px">Total líquido</div>
           <div style="font-size:15px;font-weight:700;color:var(--green-mid)">${fmtR(totalLiq)}</div>
         </div>
-        <div style="background:#f7f5f0;border-radius:8px;padding:10px;border-left:3px solid var(--amber)">
+        <div style="background:#f5ede4;border-radius:8px;padding:10px;border-left:3px solid var(--amber)">
           <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px">Previsão restante</div>
           <div style="font-size:15px;font-weight:700;color:var(--amber)">${totalPrevisto>0?fmtR(totalPrevisto):'—'}</div>
         </div>
@@ -1589,7 +1589,7 @@ window.gerarPDFProfissional = function(nome) {
   const totalDias = registros.length;
   const totalHoras = decimalParaHoras(registros.reduce((s,r)=>s+(r.horas||0),0));
   const rows = registros.map((r,i)=>'<tr style="background:'+(i%2===0?'#f9f9f9':'#fff')+'"><td>'+new Date(r.data+'T00:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})+'</td><td style="text-align:center;font-weight:500">'+(r.horasFormatado||decimalParaHoras(r.horas||0))+'</td><td style="color:#666">'+(r.obs||'—')+'</td></tr>').join('');
-  const html = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>'+nome+' - Nossa Casa</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;padding:32px;color:#1a1a1a}h1{color:#1a4a3a;font-size:22px;margin-bottom:4px}.sub{color:#666;font-size:12px;margin-bottom:24px}table{width:100%;border-collapse:collapse;margin-top:16px}th{background:#1a4a3a;color:#fff;padding:9px 12px;text-align:left;font-size:12px}td{padding:8px 12px;border-bottom:1px solid #eee}.totais{margin-top:20px;background:#e8f5f0;border-radius:8px;padding:16px;display:flex;gap:32px}.tot-item .tot-label{font-size:12px;color:#666}.tot-item .tot-val{font-size:20px;font-weight:bold;color:#1a4a3a}.rodape{margin-top:32px;font-size:11px;color:#999;text-align:center}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}</style></head><body><h1>Nossa Casa — '+nome+'</h1><div class="sub">Gerado em '+new Date().toLocaleDateString('pt-BR')+'</div><table><thead><tr><th>Data</th><th style="text-align:center">Horas</th><th>Observação</th></tr></thead><tbody>'+rows+'</tbody></table><div class="totais"><div class="tot-item"><div class="tot-label">Total de dias</div><div class="tot-val">'+totalDias+'</div></div><div class="tot-item"><div class="tot-label">Total de horas</div><div class="tot-val">'+totalHoras+'</div></div></div><div class="rodape">Relatório gerado pelo app Nossa Casa</div><script>window.onload=()=>{window.print()}<\/script></body></html>';
+  const html = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>'+nome+' - Nossa Casa</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;padding:32px;color:#1a1a1a}h1{color:#5c3d1e;font-size:22px;margin-bottom:4px}.sub{color:#666;font-size:12px;margin-bottom:24px}table{width:100%;border-collapse:collapse;margin-top:16px}th{background:#5c3d1e;color:#fff;padding:9px 12px;text-align:left;font-size:12px}td{padding:8px 12px;border-bottom:1px solid #eee}.totais{margin-top:20px;background:#e8f5f0;border-radius:8px;padding:16px;display:flex;gap:32px}.tot-item .tot-label{font-size:12px;color:#666}.tot-item .tot-val{font-size:20px;font-weight:bold;color:#5c3d1e}.rodape{margin-top:32px;font-size:11px;color:#999;text-align:center}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}</style></head><body><h1>Nossa Casa — '+nome+'</h1><div class="sub">Gerado em '+new Date().toLocaleDateString('pt-BR')+'</div><table><thead><tr><th>Data</th><th style="text-align:center">Horas</th><th>Observação</th></tr></thead><tbody>'+rows+'</tbody></table><div class="totais"><div class="tot-item"><div class="tot-label">Total de dias</div><div class="tot-val">'+totalDias+'</div></div><div class="tot-item"><div class="tot-label">Total de horas</div><div class="tot-val">'+totalHoras+'</div></div></div><div class="rodape">Relatório gerado pelo app Nossa Casa</div><script>window.onload=()=>{window.print()}<\/script></body></html>';
   const blob = new Blob([html],{type:'text/html'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -2595,7 +2595,7 @@ window.marcarGastoPago = function(id) {
 window.gerarPDFCaixa = function() {
   const el=etapas.filter(e=>e.liberado).sort((a,b)=>a.numero-b.numero);
   const tb=el.reduce((s,e)=>s+(e.valorBruto||0),0),tt=el.reduce((s,e)=>s+(e.taxas||0),0),tl=tb-tt;
-  const rows=el.map(e=>`<tr><td><b>Etapa ${e.numero}</b></td><td>${fmtData(e.data)}</td><td>${r$(e.valorBruto||0)}</td><td style="color:#b33a3a">${r$(e.taxas||0)}</td><td style="color:#2d6b55;font-weight:700">${r$((e.valorBruto||0)-(e.taxas||0))}</td><td>${e.obs||'—'}</td></tr>`).join('');
+  const rows=el.map(e=>`<tr><td><b>Etapa ${e.numero}</b></td><td>${fmtData(e.data)}</td><td>${r$(e.valorBruto||0)}</td><td style="color:#b33a3a">${r$(e.taxas||0)}</td><td style="color:#8b5e3c;font-weight:700">${r$((e.valorBruto||0)-(e.taxas||0))}</td><td>${e.obs||'—'}</td></tr>`).join('');
   const body=`<div class="rg"><div class="rc"><div class="rl">Etapas liberadas</div><div class="rv">${el.length} de 12</div></div><div class="rc"><div class="rl">Total bruto</div><div class="rv">${r$(tb)}</div></div><div class="rc red"><div class="rl">Total taxas</div><div class="rv">${r$(tt)}</div></div><div class="rc green"><div class="rl">Total líquido</div><div class="rv">${r$(tl)}</div></div></div><h2>Detalhes por etapa</h2>${el.length===0?'<p style="color:#999;padding:12px 0">Nenhuma etapa liberada ainda.</p>':`<table><thead><tr><th>Etapa</th><th>Data de liberação</th><th>Valor bruto</th><th>Taxas</th><th>Valor líquido</th><th>Observação</th></tr></thead><tbody>${rows}<tr class="tr"><td colspan="2">TOTAL</td><td>${r$(tb)}</td><td>${r$(tt)}</td><td>${r$(tl)}</td><td></td></tr></tbody></table>`}`;
   gerarPDF('Caixa Econômica', body);
 };
@@ -2648,7 +2648,7 @@ window.gerarPDFPendentes = function() {
 
 window.gerarPDFDashboard = function() {
   const s=calcSaldos(); const el=etapas.filter(e=>e.liberado).sort((a,b)=>a.numero-b.numero);
-  const body=`<h2>Entradas</h2><div class="rg"><div class="rc green"><div class="rl">Caixa Econômica (bruto)</div><div class="rv">${r$(s.totalCaixaBruto)}</div></div><div class="rc red"><div class="rl">Taxas Caixa</div><div class="rv">${r$(s.totalTaxasEtapas)}</div></div><div class="rc green"><div class="rl">Recursos próprios</div><div class="rv">${r$(s.totalAportesProprios)}</div></div><div class="rc green"><div class="rl">Total de entradas</div><div class="rv">${r$(s.totalEntradas)}</div></div></div><h2>Saídas</h2><div class="rg"><div class="rc red"><div class="rl">Total já pago</div><div class="rv">${r$(s.totalPago)}</div></div><div class="rc red"><div class="rl">Taxas</div><div class="rv">${r$(s.totalTaxas)}</div></div><div class="rc amber"><div class="rl">Parcelas em aberto</div><div class="rv">${r$(s.parcelasFuturas)}</div></div><div class="rc amber"><div class="rl">Pendentes</div><div class="rv">${r$(s.totalPendente)}</div></div><div class="rc red"><div class="rl">Total comprometido</div><div class="rv">${r$(s.totalComprometido)}</div></div></div><h2>Etapas Caixa (${el.length} de 12 liberadas)</h2>${el.length===0?'<p style="color:#999;padding:12px 0">Nenhuma etapa liberada ainda.</p>':`<table><thead><tr><th>Etapa</th><th>Data</th><th>Bruto</th><th>Taxas</th><th>Líquido</th></tr></thead><tbody>${el.map(e=>`<tr><td>Etapa ${e.numero}</td><td>${fmtData(e.data)}</td><td>${r$(e.valorBruto||0)}</td><td>${r$(e.taxas||0)}</td><td style="color:#2d6b55;font-weight:700">${r$((e.valorBruto||0)-(e.taxas||0))}</td></tr>`).join('')}</tbody></table>`}`;
+  const body=`<h2>Entradas</h2><div class="rg"><div class="rc green"><div class="rl">Caixa Econômica (bruto)</div><div class="rv">${r$(s.totalCaixaBruto)}</div></div><div class="rc red"><div class="rl">Taxas Caixa</div><div class="rv">${r$(s.totalTaxasEtapas)}</div></div><div class="rc green"><div class="rl">Recursos próprios</div><div class="rv">${r$(s.totalAportesProprios)}</div></div><div class="rc green"><div class="rl">Total de entradas</div><div class="rv">${r$(s.totalEntradas)}</div></div></div><h2>Saídas</h2><div class="rg"><div class="rc red"><div class="rl">Total já pago</div><div class="rv">${r$(s.totalPago)}</div></div><div class="rc red"><div class="rl">Taxas</div><div class="rv">${r$(s.totalTaxas)}</div></div><div class="rc amber"><div class="rl">Parcelas em aberto</div><div class="rv">${r$(s.parcelasFuturas)}</div></div><div class="rc amber"><div class="rl">Pendentes</div><div class="rv">${r$(s.totalPendente)}</div></div><div class="rc red"><div class="rl">Total comprometido</div><div class="rv">${r$(s.totalComprometido)}</div></div></div><h2>Etapas Caixa (${el.length} de 12 liberadas)</h2>${el.length===0?'<p style="color:#999;padding:12px 0">Nenhuma etapa liberada ainda.</p>':`<table><thead><tr><th>Etapa</th><th>Data</th><th>Bruto</th><th>Taxas</th><th>Líquido</th></tr></thead><tbody>${el.map(e=>`<tr><td>Etapa ${e.numero}</td><td>${fmtData(e.data)}</td><td>${r$(e.valorBruto||0)}</td><td>${r$(e.taxas||0)}</td><td style="color:#8b5e3c;font-weight:700">${r$((e.valorBruto||0)-(e.taxas||0))}</td></tr>`).join('')}</tbody></table>`}`;
   gerarPDF('Resumo do Dashboard', body);
 };
 
@@ -2667,7 +2667,7 @@ window.gerarPDFGastos = function() {
 window.gerarPDFEtapas = function() {
   const el=etapas.filter(e=>e.liberado).sort((a,b)=>a.numero-b.numero);
   const tb=el.reduce((s,e)=>s+(e.valorBruto||0),0),tt=el.reduce((s,e)=>s+(e.taxas||0),0),tl=tb-tt;
-  const rows=el.map(e=>`<tr><td><b>Etapa ${e.numero}</b></td><td>${fmtData(e.data)}</td><td>${r$(e.valorBruto||0)}</td><td style="color:#b33a3a">${r$(e.taxas||0)}</td><td style="color:#2d6b55;font-weight:700">${r$((e.valorBruto||0)-(e.taxas||0))}</td><td>${e.obs||'—'}</td></tr>`).join('');
+  const rows=el.map(e=>`<tr><td><b>Etapa ${e.numero}</b></td><td>${fmtData(e.data)}</td><td>${r$(e.valorBruto||0)}</td><td style="color:#b33a3a">${r$(e.taxas||0)}</td><td style="color:#8b5e3c;font-weight:700">${r$((e.valorBruto||0)-(e.taxas||0))}</td><td>${e.obs||'—'}</td></tr>`).join('');
   const body=`<div class="rg"><div class="rc"><div class="rl">Etapas liberadas</div><div class="rv">${el.length} de 12</div></div><div class="rc"><div class="rl">Etapas pendentes</div><div class="rv">${12-el.length}</div></div><div class="rc green"><div class="rl">Total bruto</div><div class="rv">${r$(tb)}</div></div><div class="rc red"><div class="rl">Total taxas</div><div class="rv">${r$(tt)}</div></div><div class="rc green"><div class="rl">Total líquido</div><div class="rv">${r$(tl)}</div></div></div><h2>Detalhes por etapa</h2>${el.length===0?'<p style="color:#999;padding:12px 0">Nenhuma etapa liberada ainda.</p>':`<table><thead><tr><th>Etapa</th><th>Data de liberação</th><th>Valor bruto</th><th>Taxas</th><th>Valor líquido</th><th>Observação</th></tr></thead><tbody>${rows}<tr class="tr"><td colspan="2">TOTAL</td><td>${r$(tb)}</td><td>${r$(tt)}</td><td>${r$(tl)}</td><td></td></tr></tbody></table>`}`;
   gerarPDF('Etapas Caixa', body);
 };
@@ -2690,7 +2690,7 @@ window.gerarPDFGeral = function() {
   const porProfGeral = {}; todosMaoGeral.forEach(r=>{const p=r.profissional||'Outros';if(!porProfGeral[p]){porProfGeral[p]={dias:0,horas:0};}porProfGeral[p].dias++;porProfGeral[p].horas+=r.horas||0;});
   const porCat={}; gastos.forEach(g=>{porCat[g.categoria]=(porCat[g.categoria]||0)+(g.valor||0);});
   const catRows=Object.entries(porCat).sort((a,b)=>b[1]-a[1]).map(([cat,val])=>{const c=getCat(cat);return `<tr><td>${c.icon} ${c.label}</td><td>${r$(val)}</td><td>${s.totalPago>0?Math.round(val/s.totalPago*100):0}%</td></tr>`;}).join('');
-  const body=`<h2>Entradas</h2><div class="rg"><div class="rc green"><div class="rl">Caixa Econômica (bruto)</div><div class="rv">${r$(s.totalCaixaBruto)}</div></div><div class="rc red"><div class="rl">Taxas Caixa</div><div class="rv">${r$(s.totalTaxasEtapas)}</div></div><div class="rc green"><div class="rl">Recursos próprios</div><div class="rv">${r$(s.totalAportesProprios)}</div></div><div class="rc green"><div class="rl">Total de entradas</div><div class="rv">${r$(s.totalEntradas)}</div></div></div><h2>Saídas</h2><div class="rg"><div class="rc red"><div class="rl">Total já pago</div><div class="rv">${r$(s.totalPago)}</div></div><div class="rc red"><div class="rl">Total de taxas</div><div class="rv">${r$(s.totalTaxas)}</div></div><div class="rc amber"><div class="rl">Parcelas em aberto</div><div class="rv">${r$(s.parcelasFuturas)}</div></div><div class="rc amber"><div class="rl">Pendentes</div><div class="rv">${r$(s.totalPendente)}</div></div><div class="rc red"><div class="rl">Total comprometido</div><div class="rv">${r$(s.totalComprometido)}</div></div></div><h2>Gastos por categoria</h2><table><thead><tr><th>Categoria</th><th>Total</th><th>% do pago</th></tr></thead><tbody>${catRows}</tbody></table><h2>Etapas Caixa (${el.length} de 12 liberadas)</h2>${el.length===0?'<p style="color:#999;padding:12px 0">Nenhuma etapa liberada ainda.</p>':`<table><thead><tr><th>Etapa</th><th>Data</th><th>Bruto</th><th>Taxas</th><th>Líquido</th></tr></thead><tbody>${el.map(e=>`<tr><td>Etapa ${e.numero}</td><td>${fmtData(e.data)}</td><td>${r$(e.valorBruto||0)}</td><td>${r$(e.taxas||0)}</td><td style="color:#2d6b55;font-weight:700">${r$((e.valorBruto||0)-(e.taxas||0))}</td></tr>`).join('')}</tbody></table>`}<h2>Mão de obra</h2><div class="rg"><div class="rc"><div class="rl">👷 Pedreiro — Dias</div><div class="rv">${tdp}</div></div><div class="rc"><div class="rl">👷 Pedreiro — Horas</div><div class="rv">${thp}</div></div><div class="rc"><div class="rl">🧱 Servente — Dias</div><div class="rv">${tds}</div></div><div class="rc"><div class="rl">🧱 Servente — Horas</div><div class="rv">${ths}</div></div></div>`;
+  const body=`<h2>Entradas</h2><div class="rg"><div class="rc green"><div class="rl">Caixa Econômica (bruto)</div><div class="rv">${r$(s.totalCaixaBruto)}</div></div><div class="rc red"><div class="rl">Taxas Caixa</div><div class="rv">${r$(s.totalTaxasEtapas)}</div></div><div class="rc green"><div class="rl">Recursos próprios</div><div class="rv">${r$(s.totalAportesProprios)}</div></div><div class="rc green"><div class="rl">Total de entradas</div><div class="rv">${r$(s.totalEntradas)}</div></div></div><h2>Saídas</h2><div class="rg"><div class="rc red"><div class="rl">Total já pago</div><div class="rv">${r$(s.totalPago)}</div></div><div class="rc red"><div class="rl">Total de taxas</div><div class="rv">${r$(s.totalTaxas)}</div></div><div class="rc amber"><div class="rl">Parcelas em aberto</div><div class="rv">${r$(s.parcelasFuturas)}</div></div><div class="rc amber"><div class="rl">Pendentes</div><div class="rv">${r$(s.totalPendente)}</div></div><div class="rc red"><div class="rl">Total comprometido</div><div class="rv">${r$(s.totalComprometido)}</div></div></div><h2>Gastos por categoria</h2><table><thead><tr><th>Categoria</th><th>Total</th><th>% do pago</th></tr></thead><tbody>${catRows}</tbody></table><h2>Etapas Caixa (${el.length} de 12 liberadas)</h2>${el.length===0?'<p style="color:#999;padding:12px 0">Nenhuma etapa liberada ainda.</p>':`<table><thead><tr><th>Etapa</th><th>Data</th><th>Bruto</th><th>Taxas</th><th>Líquido</th></tr></thead><tbody>${el.map(e=>`<tr><td>Etapa ${e.numero}</td><td>${fmtData(e.data)}</td><td>${r$(e.valorBruto||0)}</td><td>${r$(e.taxas||0)}</td><td style="color:#8b5e3c;font-weight:700">${r$((e.valorBruto||0)-(e.taxas||0))}</td></tr>`).join('')}</tbody></table>`}<h2>Mão de obra</h2><div class="rg"><div class="rc"><div class="rl">👷 Pedreiro — Dias</div><div class="rv">${tdp}</div></div><div class="rc"><div class="rl">👷 Pedreiro — Horas</div><div class="rv">${thp}</div></div><div class="rc"><div class="rl">🧱 Servente — Dias</div><div class="rv">${tds}</div></div><div class="rc"><div class="rl">🧱 Servente — Horas</div><div class="rv">${ths}</div></div></div>`;
   gerarPDF('Relatório Geral Completo', body);
 };
 
@@ -3228,7 +3228,7 @@ window.gerarPDFEtapaTarefas = function(num) {
   const rows = tsDaEtapa.map((t,i)=>{
     const inicio = t.dataInicio ? new Date(t.dataInicio+'T00:00:00').toLocaleDateString('pt-BR') : '—';
     const fim = t.concluidaEm ? new Date(t.concluidaEm+'T00:00:00').toLocaleDateString('pt-BR') : '—';
-    const status = t.concluida ? '<span style="background:#e8f5f0;color:#2d6b55;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">✅ Concluída</span>' : '<span style="background:#fdf3e3;color:#c17f24;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">Pendente</span>';
+    const status = t.concluida ? '<span style="background:#e8f5f0;color:#8b5e3c;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">✅ Concluída</span>' : '<span style="background:#fdf3e3;color:#c17f24;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">Pendente</span>';
     return '<tr>'
       +'<td>'+(i+1)+'</td>'
       +'<td><strong>'+t.nome+'</strong>'+(t.obs?'<br><small style="color:#888">'+t.obs+'</small>':'')+'</td>'
@@ -3245,9 +3245,9 @@ window.gerarPDFEtapaTarefas = function(num) {
     +'<div class="rc green"><div class="rl">Progresso</div><div class="rv">'+prog.pct+'%</div></div>'
     +'</div>'
     +'<div style="height:10px;background:#e0ddd6;border-radius:5px;overflow:hidden;margin-bottom:20px">'
-      +'<div style="height:100%;width:'+prog.pct+'%;background:#4caf87;border-radius:5px"></div>'
+      +'<div style="height:100%;width:'+prog.pct+'%;background:#c4885a;border-radius:5px"></div>'
     +'</div>'
-    +(et&&et.liberado?'<p style="font-size:12px;color:#2d6b55;margin-bottom:16px">✅ Etapa liberada pela Caixa em '+(et.data?new Date(et.data+'T00:00:00').toLocaleDateString('pt-BR'):'—')+'</p>':'')
+    +(et&&et.liberado?'<p style="font-size:12px;color:#8b5e3c;margin-bottom:16px">✅ Etapa liberada pela Caixa em '+(et.data?new Date(et.data+'T00:00:00').toLocaleDateString('pt-BR'):'—')+'</p>':'')
     +'<h2>Tarefas</h2>'
     +(tsDaEtapa.length===0
       ? '<p style="color:#999;padding:12px 0">Nenhuma tarefa cadastrada.</p>'
@@ -3273,24 +3273,24 @@ window.gerarPDFProgressoObra = function() {
           const inicio = t.dataInicio ? new Date(t.dataInicio+'T00:00:00').toLocaleDateString('pt-BR') : '—';
           const fim = t.concluidaEm ? new Date(t.concluidaEm+'T00:00:00').toLocaleDateString('pt-BR') : '—';
           const status = t.concluida
-            ? '<span style="background:#e8f5f0;color:#2d6b55;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:600">✅ Concluída</span>'
+            ? '<span style="background:#e8f5f0;color:#8b5e3c;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:600">✅ Concluída</span>'
             : '<span style="background:#fdf3e3;color:#c17f24;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:600">Pendente</span>';
           return '<tr><td>'+t.nome+(t.obs?'<br><small style="color:#888">'+t.obs+'</small>':'')+'</td><td>'+inicio+'</td><td>'+fim+'</td><td>'+status+'</td></tr>';
         }).join('');
 
     return '<div style="margin-bottom:24px;page-break-inside:avoid">'
-      +'<div style="display:flex;justify-content:space-between;align-items:center;background:#f7f5f0;border-radius:8px;padding:10px 14px;margin-bottom:8px;border-left:3px solid '+(prog.pct===100?'#4caf87':'#1a4a3a')+'">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;background:#f5ede4;border-radius:8px;padding:10px 14px;margin-bottom:8px;border-left:3px solid '+(prog.pct===100?'#c4885a':'#5c3d1e')+'">'
         +'<div>'
           +'<strong style="font-size:13px">Etapa '+num+'</strong>'
-          +(liberada?'<span style="margin-left:8px;background:#e8f5f0;color:#2d6b55;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:600">Liberada</span>':'')
+          +(liberada?'<span style="margin-left:8px;background:#e8f5f0;color:#8b5e3c;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:600">Liberada</span>':'')
         +'</div>'
         +'<div style="text-align:right">'
-          +'<strong style="color:'+(prog.pct===100?'#2d6b55':'#1a4a3a')+'">'+prog.pct+'%</strong>'
+          +'<strong style="color:'+(prog.pct===100?'#8b5e3c':'#5c3d1e')+'">'+prog.pct+'%</strong>'
           +'<div style="font-size:10px;color:#888">'+prog.concluidas+'/'+prog.total+' tarefas</div>'
         +'</div>'
       +'</div>'
       +'<div style="height:6px;background:#e0ddd6;border-radius:3px;overflow:hidden;margin-bottom:10px">'
-        +'<div style="height:100%;width:'+prog.pct+'%;background:#4caf87;border-radius:3px"></div>'
+        +'<div style="height:100%;width:'+prog.pct+'%;background:#c4885a;border-radius:3px"></div>'
       +'</div>'
       +(tsDaEtapa.length>0
         ? '<table><thead><tr><th>Tarefa</th><th>Data de início</th><th>Data de conclusão</th><th>Status</th></tr></thead><tbody>'+tarefasRows+'</tbody></table>'
@@ -3304,7 +3304,7 @@ window.gerarPDFProgressoObra = function() {
     +(pg.base==='tarefas'?'<div class="rc green"><div class="rl">Tarefas concluídas</div><div class="rv">'+pg.concluidas+'</div></div><div class="rc"><div class="rl">Total de tarefas</div><div class="rv">'+pg.total+'</div></div>':'')
     +'</div>'
     +'<div style="height:10px;background:#e0ddd6;border-radius:5px;overflow:hidden;margin-bottom:24px">'
-      +'<div style="height:100%;width:'+pg.pct+'%;background:#4caf87;border-radius:5px"></div>'
+      +'<div style="height:100%;width:'+pg.pct+'%;background:#c4885a;border-radius:5px"></div>'
     +'</div>'
     +'<h2>Detalhes por etapa</h2>'
     +rows;
