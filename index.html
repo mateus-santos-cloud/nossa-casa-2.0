@@ -855,7 +855,7 @@ function renderDashboard() {
   let diasSemLanc = 0;
   if(datasLancamentos.length>0){
     const ultima = new Date(Math.max(...datasLancamentos));
-    diasSemLanc = Math.floor((hoje-ultima)/(1000*60*60*24));
+    diasSemLanc = Math.max(0, Math.floor((hoje-ultima)/(1000*60*60*24)));
   }
 
   // Pedreiro e servente do mês
