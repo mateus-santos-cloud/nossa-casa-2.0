@@ -102,7 +102,7 @@
   .btn-primary{width:100%;background:linear-gradient(135deg,#5c3d1e,#8b5e3c);color:#fff;border:none;border-radius:var(--radius-sm);padding:14px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:500;cursor:pointer;margin-top:8px;transition:background 0.2s}
   .btn-primary:active{background:var(--green-mid)}
   .btn-secondary{width:100%;background:transparent;color:var(--text-muted);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer;margin-top:8px}
-  .parcelas-info{background:var(--blue-light);border-radius:var(--radius-sm);padding:10px 12px;font-size:12px;color:var(--blue);margin-top:8px}
+  .parcelas-info{background:var(--green-light);border-radius:var(--radius-sm);padding:10px 12px;font-size:13px;color:var(--green-mid);margin-top:8px;border:1px solid var(--border)}
 
   /* ETAPAS */
   .etapa-item{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);padding:14px;margin-bottom:8px}
@@ -1997,6 +1997,8 @@ window.abrirModalGasto = function(id) {
   toggleProfissional();
   if(g && g.categoria === 'mao_obra') setTimeout(()=>{ const s = document.getElementById('f-profissional'); if(s && g.profissional) s.value = g.profissional; },50);
   setupMoeda('f-valor');
+  document.getElementById('f-valor')?.addEventListener('input', ()=>updateParcelaInfo());
+  document.getElementById('f-nparcelas')?.addEventListener('change', ()=>updateParcelaInfo());
   if(g && g.valor) { const el=document.getElementById('f-valor'); if(el){el.value=g.valor.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});el.dataset.valor=g.valor.toFixed(2);} }
   document.getElementById('btn-salvar-gasto').onclick = salvarGasto;
 };
@@ -2020,10 +2022,17 @@ window.toggleNovoProfissional = function() {
 };
 
 window.updateParcelaInfo = function() {
-  const valor = parseFloat(document.getElementById('f-valor')?.value)||0;
+  const valor = getValorInput('f-valor')||0;
   const n = parseInt(document.getElementById('f-nparcelas')?.value)||1;
   const info = document.getElementById('parcela-info');
-  if(info && valor>0) info.textContent = `${n}x de ${fmtR(valor/n)} por mês`;
+  if(!info) return;
+  if(valor>0) {
+    info.innerHTML = '<strong>'+n+'x de '+fmtR(valor/n)+'</strong> por mês · Total: '+fmtR(valor);
+    info.style.display = 'block';
+  } else {
+    info.textContent = '';
+    info.style.display = 'none';
+  }
 };
 
 window.abrirModalEtapa = function() {
