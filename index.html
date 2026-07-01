@@ -732,15 +732,31 @@ function calcProgressoEtapa(etapaNum) {
 }
 
 function calcProgressoGeral() {
-  // Progresso baseado nas tarefas de todas as etapas que têm tarefas cadastradas
-  const etapasComTarefas = [...new Set(tarefas.map(t=>t.etapa))];
-  if(etapasComTarefas.length===0) {
-    // fallback: etapas liberadas
-    return {pct: Math.round(etapas.filter(e=>e.liberado).length/12*100), base:'etapas'};
+  // Progresso baseado nas 12 etapas
+  // Cada etapa vale 1/12 do total
+  // Dentro de cada etapa, o progresso é proporcional às tarefas concluídas
+  const TOTAL_ETAPAS = 12;
+  let somaProgresso = 0;
+  let totalTarefasGeral = 0;
+  let concluidasGeral = 0;
+
+  for(let num = 1; num <= TOTAL_ETAPAS; num++) {
+    const tsDaEtapa = tarefas.filter(t=>t.etapa===num);
+    if(tsDaEtapa.length === 0) {
+      // Sem tarefas: 0% de progresso nessa etapa
+      // A menos que esteja liberada pela Caixa (considera 100%)
+      const et = etapas.find(e=>e.numero===num);
+      if(et && et.liberado) somaProgresso += 1;
+    } else {
+      const concluidas = tsDaEtapa.filter(t=>t.concluida).length;
+      somaProgresso += concluidas / tsDaEtapa.length;
+      totalTarefasGeral += tsDaEtapa.length;
+      concluidasGeral += concluidas;
+    }
   }
-  const totalTarefas = tarefas.length;
-  const concluidas = tarefas.filter(t=>t.concluida).length;
-  return {pct: Math.round(concluidas/totalTarefas*100), base:'tarefas', total:totalTarefas, concluidas};
+
+  const pct = Math.round(somaProgresso / TOTAL_ETAPAS * 100);
+  return {pct, base:'tarefas', total:totalTarefasGeral, concluidas:concluidasGeral};
 }
 
 function calcSaldos() {
