@@ -2937,6 +2937,51 @@ window.toggleTarefa = function(id, concluida, etapaNum) {
   }
 };
 
+window.editarTarefa = function(id, etapaNum) {
+  const t = tarefas.find(x=>x.id===id);
+  if(!t) { showToast('Tarefa não encontrada.'); return; }
+  const overlay = document.getElementById('modal-overlay');
+  const mc = document.getElementById('modal-content');
+  mc.innerHTML = ''
+    +'<div class="modal-handle"></div>'
+    +'<div class="modal-title">Editar tarefa</div>'
+    +'<div class="form-group">'
+      +'<label class="form-label">Nome da tarefa</label>'
+      +'<input class="form-input" id="edit-tarefa-nome" type="text">'
+    +'</div>'
+    +'<div class="form-group">'
+      +'<label class="form-label">Data de início</label>'
+      +'<input class="form-input" id="edit-tarefa-inicio" type="date" value="'+(t.dataInicio||'')+'">'
+    +'</div>'
+    +'<div class="form-group">'
+      +'<label class="form-label">Data prevista de conclusão (opcional)</label>'
+      +'<input class="form-input" id="edit-tarefa-previsao" type="date" value="'+(t.dataPrevista||'')+'">'
+    +'</div>'
+    +'<div class="form-group">'
+      +'<label class="form-label">Observação (opcional)</label>'
+      +'<input class="form-input" id="edit-tarefa-obs" type="text">'
+    +'</div>'
+    +'<button class="btn-primary" id="btn-salvar-edicao-tarefa">Salvar alterações</button>'
+    +'<button class="btn-secondary" onclick="fecharModal();setTimeout(()=>abrirTarefasEtapa('+etapaNum+'),200)">Cancelar</button>';
+  document.getElementById('edit-tarefa-nome').value = t.nome||'';
+  document.getElementById('edit-tarefa-obs').value = t.obs||'';
+  overlay.classList.add('open');
+  document.getElementById('btn-salvar-edicao-tarefa').onclick = async () => {
+    const nome = document.getElementById('edit-tarefa-nome').value.trim();
+    const inicio = document.getElementById('edit-tarefa-inicio').value;
+    if(!nome) { showToast('Digite o nome da tarefa'); return; }
+    if(!inicio) { showToast('Informe a data de início'); return; }
+    const previsao = document.getElementById('edit-tarefa-previsao').value;
+    const obs = document.getElementById('edit-tarefa-obs').value.trim();
+    try {
+      await updateDoc(doc(db,'tarefas',id), { nome, dataInicio: inicio, dataPrevista: previsao, obs });
+      showToast('Tarefa atualizada!');
+      fecharModal();
+      setTimeout(()=>abrirTarefasEtapa(etapaNum), 200);
+    } catch(e) { showToast('Erro ao atualizar.'); console.error(e); }
+  };
+};
+
 window.deletarTarefa = function(id) {
   showConfirm({
     titulo: 'Excluir tarefa',
