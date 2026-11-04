@@ -261,12 +261,14 @@ let etapas = [];
 let diarias = [];
 let serventes = [];
 let maodeobra = [];
+let acertos = [];
 let aportes = [];
 let tarefas = [];
 let profissionaisMao = ['Pedreiro','Servente','Eletricista','Encanador','Pintor','Gesseiro','Marmorista','Marceneiro','Serralheiro','Outros'];
 let unsubDiarias = null;
 let unsubServentes = null;
 let unsubMaodeobra = null;
+let unsubAcertos = null;
 let unsubAportes = null;
 let unsubTarefas = null;
 let profissionais = [...PROFISSIONAIS_PADRAO];
@@ -913,17 +915,8 @@ function renderDashboard() {
       })()}
     </div>
 
-    <!-- MÃO DE OBRA DO MÊS -->
-    <div class="card" style="margin-bottom:12px;cursor:pointer" onclick="abrirMaoDeObraMes()">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.6px">👷 Mão de obra em ${nomeMes} ›</div>
-        <div style="font-size:11px;color:var(--text-hint)">${maoMes.length} registro${maoMes.length!==1?'s':''}</div>
-      </div>
-      ${Object.keys(porProfMes).length===0
-        ? '<div style="font-size:13px;color:var(--text-muted)">Nenhum registro neste mês</div>'
-        : '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'+Object.entries(porProfMes).map(([p,v])=>'<div style="background:var(--green-light);border-radius:8px;padding:10px"><div style="font-size:11px;color:var(--green-mid);margin-bottom:2px">'+p+'</div><div style="font-size:14px;font-weight:600;color:var(--green-mid)">'+v.dias+' dias</div><div style="font-size:11px;color:var(--green-mid)">'+decimalParaHoras(v.horas)+' horas</div></div>').join('')+'</div>'
-      }
-    </div>
+    <!-- MÃO DE OBRA POR ETAPA -->
+    ${renderCardMaoDashboard()}
 
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <div class="section-title" style="margin-bottom:0">Entradas</div>
@@ -1271,63 +1264,337 @@ function renderEtapaItem(num, et) {
 }
 
 
+// ===================== ACERTOS POR ETAPA (MÃO DE OBRA) =====================
+// Cada acerto = valor combinado com um profissional por uma etapa (coleção 'acertos').
+// Os pagamentos continuam sendo lançados em Gastos (categoria mão de obra) e se ligam ao acerto via gasto.acertoId.
+function listaProfissionaisTodos() {
+  const nomes = [];
+  const add = function(n) { if(n && !nomes.includes(n)) nomes.push(n); };
+  profissionaisMao.forEach(add);
+  profissionais.forEach(add);
+  acertos.forEach(function(a){ add(a.profissional); });
+  return nomes;
+}
+
+function opcoesProfissionalHtml(selecionado) {
+  let h = '';
+  listaProfissionaisTodos().forEach(function(p) {
+    h += '<option value="'+p+'"'+(p===selecionado?' selected':'')+'>'+p+'</option>';
+  });
+  return h;
+}
+
+function calcPagoAcerto(acertoId) {
+  return gastos.filter(function(g){ return g.acertoId===acertoId && g.status==='pago'; })
+    .reduce(function(s,g){ return s+(g.valor||0); }, 0);
+}
+
+function calcAgendadoAcerto(acertoId) {
+  return gastos.filter(function(g){ return g.acertoId===acertoId && g.status!=='pago'; })
+    .reduce(function(s,g){ return s+(g.valor||0); }, 0);
+}
+
+function resumoAcertosProf(nome) {
+  const lista = acertos.filter(function(a){ return (a.profissional||'Outros')===nome; });
+  const acertado = lista.reduce(function(s,a){ return s+(a.valor||0); }, 0);
+  const pago = lista.reduce(function(s,a){ return s+calcPagoAcerto(a.id); }, 0);
+  return {lista:lista, acertado:acertado, pago:pago, saldo:acertado-pago};
+}
+
+function renderCardMaoDashboard() {
+  const nomes = [];
+  acertos.forEach(function(a){ const p = a.profissional||'Outros'; if(!nomes.includes(p)) nomes.push(p); });
+  nomes.sort(function(a,b){ return a.localeCompare(b); });
+  let corpo;
+  if(nomes.length===0) {
+    corpo = '<div style="font-size:13px;color:var(--text-muted)">Nenhum acerto por etapa cadastrado</div>';
+  } else {
+    corpo = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
+      + nomes.map(function(p){
+          const r = resumoAcertosProf(p);
+          return '<div style="background:var(--green-light);border-radius:8px;padding:10px">'
+            +'<div style="font-size:11px;color:var(--green-mid);margin-bottom:2px">'+p+'</div>'
+            +'<div style="font-size:14px;font-weight:600;color:var(--green-mid)">'+r$(r.saldo)+'</div>'
+            +'<div style="font-size:11px;color:var(--green-mid)">a pagar · acertado '+r$(r.acertado)+'</div>'
+          +'</div>';
+        }).join('')
+      + '</div>';
+  }
+  return '<div class="card" style="margin-bottom:12px;cursor:pointer" onclick="irParaMaoDeObra()">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'
+      +'<div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.6px">👷 Mão de obra por etapa ›</div>'
+      +'<div style="font-size:11px;color:var(--text-hint)">'+acertos.length+' acerto'+(acertos.length!==1?'s':'')+'</div>'
+    +'</div>'
+    +corpo
+  +'</div>';
+}
+
+function htmlAcertosPdfGeral() {
+  if(acertos.length===0) return '';
+  const nomes = [];
+  acertos.forEach(function(a){ const p = a.profissional||'Outros'; if(!nomes.includes(p)) nomes.push(p); });
+  nomes.sort(function(a,b){ return a.localeCompare(b); });
+  let totA = 0, totP = 0;
+  const linhas = nomes.map(function(p){
+    const r = resumoAcertosProf(p);
+    totA += r.acertado; totP += r.pago;
+    return '<tr><td>'+p+'</td><td>'+r.lista.length+'</td><td>'+r$(r.acertado)+'</td><td>'+r$(r.pago)+'</td><td>'+r$(r.saldo)+'</td></tr>';
+  }).join('');
+  return '<h2>Mão de obra — acertos por etapa</h2><table><thead><tr><th>Profissional</th><th>Acertos</th><th>Acertado</th><th>Pago</th><th>A pagar</th></tr></thead><tbody>'
+    +linhas
+    +'<tr><td><strong>Total</strong></td><td></td><td><strong>'+r$(totA)+'</strong></td><td><strong>'+r$(totP)+'</strong></td><td><strong>'+r$(totA-totP)+'</strong></td></tr>'
+    +'</tbody></table>';
+}
+
+window.irParaMaoDeObra = function() {
+  paginaAtual = 'maodeobra';
+  render();
+};
+
+// Reabre a tela do profissional depois de salvar/excluir (os snapshots do Firebase re-renderizam o app)
+function reabrirDetalhesProf(nome) {
+  if(!nome) return;
+  setTimeout(function(){ abrirDetalhesProfissional(nome, 10, 'todos'); }, 300);
+}
+
+window.abrirModalAcerto = function(id, profPre) {
+  const a = id ? acertos.find(function(x){ return x.id===id; }) : null;
+  if(id && !a) { showToast('Acerto não encontrado.'); return; }
+  const overlay = document.getElementById('modal-overlay');
+  const mc = document.getElementById('modal-content');
+  const profSel = a ? (a.profissional||'') : (profPre||'');
+  let optsEtapa = '';
+  for(let n=1; n<=12; n++) {
+    optsEtapa += '<option value="'+n+'"'+(a && a.etapa===n ? ' selected' : '')+'>Etapa '+n+'</option>';
+  }
+  mc.innerHTML = '<div class="modal-handle"></div>'
+    +'<div class="modal-title">'+(a?'Editar acerto':'Novo acerto por etapa')+'</div>'
+    +'<div class="form-group">'
+      +'<label class="form-label">Profissional</label>'
+      +'<select class="form-input" id="ac-prof"><option value="">Selecione...</option>'+opcoesProfissionalHtml(profSel)+'<option value="__novo__">+ Adicionar novo</option></select>'
+    +'</div>'
+    +'<div id="ac-novo-wrap" style="display:none"><div class="form-group">'
+      +'<label class="form-label">Nome do profissional</label>'
+      +'<input class="form-input" id="ac-novo" type="text" placeholder="Ex: Eletricista">'
+    +'</div></div>'
+    +'<div class="form-group">'
+      +'<label class="form-label">Etapa</label>'
+      +'<select class="form-input" id="ac-etapa">'+optsEtapa+'</select>'
+    +'</div>'
+    +'<div class="form-group">'
+      +'<label class="form-label">O que será feito (descrição)</label>'
+      +'<input class="form-input" id="ac-desc" type="text" placeholder="Ex: Construir 2 paredes">'
+    +'</div>'
+    +'<div class="form-group">'
+      +'<label class="form-label">Valor acertado (R$)</label>'
+      +'<input class="form-input" id="ac-valor" type="text" inputmode="numeric" placeholder="0,00">'
+    +'</div>'
+    +'<div class="form-group">'
+      +'<label class="form-label">Status</label>'
+      +'<select class="form-input" id="ac-status">'
+        +'<option value="andamento"'+(a && a.status==='concluido' ? '' : ' selected')+'>Em andamento</option>'
+        +'<option value="concluido"'+(a && a.status==='concluido' ? ' selected' : '')+'>Concluído</option>'
+      +'</select>'
+    +'</div>'
+    +'<div class="form-group">'
+      +'<label class="form-label">Observação (opcional)</label>'
+      +'<input class="form-input" id="ac-obs" type="text">'
+    +'</div>'
+    +'<button class="btn-primary" id="btn-salvar-acerto">'+(a?'Salvar alterações':'Salvar acerto')+'</button>'
+    +'<button class="btn-secondary" id="btn-cancelar-acerto">Cancelar</button>';
+  overlay.classList.add('open');
+
+  // Texto livre via .value (evita quebrar o HTML se tiver aspas)
+  document.getElementById('ac-desc').value = a ? (a.descricao||'') : '';
+  document.getElementById('ac-obs').value = a ? (a.obs||'') : '';
+  setupMoeda('ac-valor');
+  if(a && a.valor) {
+    const el = document.getElementById('ac-valor');
+    el.value = a.valor.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+    el.dataset.valor = a.valor.toFixed(2);
+  }
+  document.getElementById('ac-prof').onchange = function() {
+    document.getElementById('ac-novo-wrap').style.display = this.value==='__novo__' ? 'block' : 'none';
+  };
+  document.getElementById('btn-cancelar-acerto').onclick = function() {
+    fecharModal();
+    reabrirDetalhesProf(a ? a.profissional : profPre);
+  };
+  document.getElementById('btn-salvar-acerto').onclick = async function() {
+    let prof = document.getElementById('ac-prof').value;
+    if(prof==='__novo__') prof = document.getElementById('ac-novo').value.trim();
+    const etapa = parseInt(document.getElementById('ac-etapa').value);
+    const descricao = document.getElementById('ac-desc').value.trim();
+    const valor = getValorInput('ac-valor');
+    const status = document.getElementById('ac-status').value;
+    const obs = document.getElementById('ac-obs').value.trim();
+    if(!prof) { showToast('Escolha o profissional'); return; }
+    if(!valor || valor<=0) { showToast('Informe o valor acertado'); return; }
+    if(!profissionaisMao.includes(prof)) profissionaisMao.push(prof);
+    const dados = {profissional:prof, etapa:etapa, descricao:descricao, valor:valor, status:status, obs:obs, atualizadoEm:new Date().toISOString()};
+    try {
+      if(a) {
+        await updateDoc(doc(db,'acertos',a.id), dados);
+        showToast('Acerto atualizado!');
+      } else {
+        dados.quem = currentUser.displayName||currentUser.email.split('@')[0];
+        dados.uid = currentUser.uid;
+        dados.criadoEm = new Date().toISOString();
+        await addDoc(collection(db,'acertos'), dados);
+        showToast('Acerto salvo!');
+      }
+      fecharModal();
+      reabrirDetalhesProf(prof);
+    } catch(e) { showToast('Erro ao salvar o acerto.'); console.error(e); }
+  };
+};
+
+window.novoAcertoProfById = function(btn) {
+  abrirModalAcerto(null, btn.getAttribute('data-prof'));
+};
+
+window.editarAcertoById = function(btn) {
+  abrirModalAcerto(btn.getAttribute('data-aid'));
+};
+
+window.alternarStatusAcertoById = async function(btn) {
+  const id = btn.getAttribute('data-aid');
+  const a = acertos.find(function(x){ return x.id===id; });
+  if(!a) return;
+  const novo = a.status==='concluido' ? 'andamento' : 'concluido';
+  try {
+    await updateDoc(doc(db,'acertos',id), {status:novo, atualizadoEm:new Date().toISOString()});
+    showToast(novo==='concluido' ? 'Acerto concluído!' : 'Acerto reaberto!');
+    fecharModal();
+    reabrirDetalhesProf(a.profissional);
+  } catch(e) { showToast('Erro ao atualizar.'); console.error(e); }
+};
+
+window.excluirAcertoById = function(btn) {
+  const id = btn.getAttribute('data-aid');
+  const a = acertos.find(function(x){ return x.id===id; });
+  if(!a) return;
+  showConfirm({
+    titulo: 'Excluir acerto?',
+    mensagem: 'Os pagamentos já lançados em Gastos continuam existindo, só perdem o vínculo com este acerto.',
+    confirmLabel: 'Excluir',
+    danger: true,
+    onConfirm: async function() {
+      try {
+        const vinculados = gastos.filter(function(g){ return g.acertoId===id; });
+        for(const g of vinculados) { await updateDoc(doc(db,'gastos',g.id), {acertoId:''}); }
+        await deleteDoc(doc(db,'acertos',id));
+        showToast('Acerto excluído!');
+        fecharModal();
+        reabrirDetalhesProf(a.profissional);
+      } catch(e) { showToast('Erro ao excluir.'); console.error(e); }
+    }
+  });
+};
+
+// Atalho: abre o formulário de gasto já como mão de obra, com profissional e acerto selecionados
+window.pagarAcertoById = function(btn) {
+  const id = btn.getAttribute('data-aid');
+  const a = acertos.find(function(x){ return x.id===id; });
+  if(!a) return;
+  window._prefillGasto = {
+    profissional: a.profissional,
+    acertoId: a.id,
+    descricao: 'Etapa '+a.etapa+(a.descricao ? ' — '+a.descricao : '')
+  };
+  fecharModal();
+  setTimeout(function(){ abrirModalGasto(); }, 250);
+};
+
+// Preenche o select "Acerto / etapa" do formulário de gasto conforme o profissional escolhido
+window.atualizarOpcoesAcerto = function(selecionado) {
+  const wrap = document.getElementById('campo-acerto');
+  const sel = document.getElementById('f-acerto');
+  const profEl = document.getElementById('f-profissional');
+  if(!wrap || !sel || !profEl) return;
+  const prof = profEl.value;
+  const lista = acertos.filter(function(a){ return a.profissional===prof; })
+    .sort(function(x,y){ return (x.etapa||0)-(y.etapa||0); });
+  if(!prof || prof==='__novo__' || lista.length===0) {
+    sel.innerHTML = '<option value="">Sem vínculo</option>';
+    wrap.style.display = 'none';
+    return;
+  }
+  let h = '<option value="">Sem vínculo</option>';
+  lista.forEach(function(a) {
+    h += '<option value="'+a.id+'"'+(a.id===selecionado ? ' selected' : '')+'>Etapa '+a.etapa+(a.descricao ? ' — '+a.descricao : '')+' ('+r$(a.valor)+')</option>';
+  });
+  sel.innerHTML = h;
+  wrap.style.display = 'block';
+};
+
 // ===================== MÃO DE OBRA =====================
 function renderMaodeobra() {
-  // Merge diarias (pedreiro legacy) + serventes (legacy) + maodeobra (new)
+  // Histórico por horas (antigo): diarias (pedreiro) + serventes + maodeobra. Não é apagado nem alterado.
   const todos = [
     ...diarias.map(d=>({...d, profissional:'Pedreiro', _col:'diarias'})),
     ...serventes.map(d=>({...d, profissional:'Servente', _col:'serventes'})),
     ...maodeobra
   ];
-
-  // Group by profissional
-  const porProf = {};
-  todos.forEach(r=>{
+  const horasPorProf = {};
+  todos.forEach(function(r) {
     const p = r.profissional||'Outros';
-    if(!porProf[p]) porProf[p]={nome:p,registros:[],totalHoras:0,totalDias:0};
-    porProf[p].registros.push(r);
-    porProf[p].totalHoras += r.horas||0;
-    porProf[p].totalDias++;
+    if(!horasPorProf[p]) horasPorProf[p] = {dias:0, horas:0};
+    horasPorProf[p].dias++;
+    horasPorProf[p].horas += r.horas||0;
   });
 
-  const profList = Object.values(porProf).sort((a,b)=>a.nome.localeCompare(b.nome));
-  const totalDiasGeral = todos.length;
-  const totalHorasGeral = decimalParaHoras(todos.reduce((s,r)=>s+(r.horas||0),0));
+  // Profissionais = quem tem horas antigas OU acertos novos
+  const nomes = Object.keys(horasPorProf);
+  acertos.forEach(function(a) { const p = a.profissional||'Outros'; if(!nomes.includes(p)) nomes.push(p); });
+  nomes.sort(function(a,b){ return a.localeCompare(b); });
 
-  const profCards = profList.length===0
-    ? '<div class="empty"><div class="empty-icon">👷</div><p>Nenhum registro ainda</p></div>'
-    : profList.map(p=>{
-        const horas = decimalParaHoras(p.totalHoras);
-        return '<div class="card" style="margin-bottom:8px;cursor:pointer" data-prof="'+p.nome+'" onclick="abrirDetalhesProfissionalById(this)">'
+  const totAcertado = acertos.reduce(function(s,a){ return s+(a.valor||0); }, 0);
+  const totPago = acertos.reduce(function(s,a){ return s+calcPagoAcerto(a.id); }, 0);
+
+  const profCards = nomes.length===0
+    ? '<div class="empty"><div class="empty-icon">👷</div><p>Nenhum profissional ainda</p></div>'
+    : nomes.map(function(nome) {
+        const r = resumoAcertosProf(nome);
+        const h = horasPorProf[nome];
+        const linhaHoras = h
+          ? '<div style="font-size:11px;color:var(--text-hint);margin-top:8px">Histórico por horas: '+h.dias+' dia'+(h.dias!==1?'s':'')+' · '+decimalParaHoras(h.horas)+'</div>'
+          : '';
+        return '<div class="card" style="margin-bottom:8px;cursor:pointer" data-prof="'+nome+'" onclick="abrirDetalhesProfissionalById(this)">'
           +'<div style="display:flex;justify-content:space-between;align-items:center">'
-            +'<div style="font-size:14px;font-weight:500">👷 '+p.nome+'</div>'
-            +'<div style="font-size:11px;color:var(--text-hint)">ver detalhes ›</div>'
+            +'<div style="font-size:14px;font-weight:500">👷 '+nome+'</div>'
+            +'<div style="font-size:11px;color:var(--text-hint)">'+r.lista.length+' acerto'+(r.lista.length!==1?'s':'')+' · ver detalhes ›</div>'
           +'</div>'
-          +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">'
+          +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px">'
             +'<div style="background:var(--green-light);border-radius:6px;padding:8px;text-align:center">'
-              +'<div style="font-size:11px;color:var(--green-mid)">Dias</div>'
-              +'<div style="font-size:16px;font-weight:700;color:var(--green-mid)">'+p.totalDias+'</div>'
+              +'<div style="font-size:11px;color:var(--green-mid)">Acertado</div>'
+              +'<div style="font-size:13px;font-weight:700;color:var(--green-mid)">'+r$(r.acertado)+'</div>'
             +'</div>'
             +'<div style="background:var(--green-light);border-radius:6px;padding:8px;text-align:center">'
-              +'<div style="font-size:11px;color:var(--green-mid)">Horas</div>'
-              +'<div style="font-size:16px;font-weight:700;color:var(--green-mid)">'+horas+'</div>'
+              +'<div style="font-size:11px;color:var(--green-mid)">Pago</div>'
+              +'<div style="font-size:13px;font-weight:700;color:var(--green-mid)">'+r$(r.pago)+'</div>'
+            +'</div>'
+            +'<div style="background:var(--green-light);border-radius:6px;padding:8px;text-align:center">'
+              +'<div style="font-size:11px;color:var(--green-mid)">A pagar</div>'
+              +'<div style="font-size:13px;font-weight:700;color:var(--green-mid)">'+r$(r.saldo)+'</div>'
             +'</div>'
           +'</div>'
+          +linhaHoras
         +'</div>';
       }).join('');
 
-  return `
-    <div class="stats-grid" style="margin-bottom:12px">
-      <div class="stat-card"><div class="sc-label">Total de profissionais</div><div class="sc-val green">${profList.length}</div></div>
-      <div class="stat-card"><div class="sc-label">Total de dias</div><div class="sc-val green">${totalDiasGeral}</div></div>
-    </div>
-    <div style="display:flex;gap:8px;margin-bottom:12px">
-      <button class="btn-primary" onclick="abrirModalRegistroMao()" style="flex:1;margin-bottom:0">+ Registrar dia trabalhado</button>
-      <button onclick="abrirModalNovoProfissional()" style="background:var(--green-light);color:var(--green);border:none;border-radius:8px;padding:0 14px;font-size:12px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap">+ Profissional</button>
-    </div>
-    ${profCards}
-  `;
+  return '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px">'
+      +'<div class="stat-card"><div class="sc-label">Acertado</div><div class="sc-val green" style="font-size:14px">'+r$(totAcertado)+'</div></div>'
+      +'<div class="stat-card"><div class="sc-label">Pago</div><div class="sc-val green" style="font-size:14px">'+r$(totPago)+'</div></div>'
+      +'<div class="stat-card"><div class="sc-label">A pagar</div><div class="sc-val red" style="font-size:14px">'+r$(totAcertado-totPago)+'</div></div>'
+    +'</div>'
+    +'<div style="display:flex;gap:8px;margin-bottom:12px">'
+      +'<button class="btn-primary" onclick="abrirModalAcerto()" style="flex:1;margin-bottom:0">+ Novo acerto por etapa</button>'
+      +'<button onclick="abrirModalNovoProfissional()" style="background:var(--green-light);color:var(--green);border:none;border-radius:8px;padding:0 14px;font-size:12px;font-weight:500;cursor:pointer;font-family:\'DM Sans\',sans-serif;white-space:nowrap">+ Profissional</button>'
+    +'</div>'
+    +profCards;
 }
+
 
 window.abrirDetalhesProfissional = function(nome, limite, filtroPer) {
   limite = limite || 10;
@@ -1417,32 +1684,73 @@ window.abrirDetalhesProfissional = function(nome, limite, filtroPer) {
       +'</div>';
     });
     if(temMais) {
-      +'<div id="btn-load-more" data-limite="'+(limite+10)+'" style="text-align:center;padding:10px;border:1px dashed var(--border);border-radius:8px;margin:8px 0;cursor:pointer;font-size:13px;color:var(--text-muted)">↓ Carregar mais 10 ('+(registros.length-limite)+' restantes)</div>'
+      linhas += '<div id="btn-load-more" data-limite="'+(limite+10)+'" style="text-align:center;padding:10px;border:1px dashed var(--border);border-radius:8px;margin:8px 0;cursor:pointer;font-size:13px;color:var(--text-muted)">↓ Carregar mais 10 ('+(registros.length-limite)+' restantes)</div>'
     }
+  }
+
+  // Acertos por etapa deste profissional
+  const resAc = resumoAcertosProf(nome);
+  const acertosOrd = resAc.lista.slice().sort(function(a,b){ return (a.etapa||0)-(b.etapa||0); });
+  let acertosHtml = '';
+  if(acertosOrd.length===0) {
+    acertosHtml = '<div class="empty"><div class="empty-icon">🧱</div><p>Nenhum acerto por etapa ainda</p></div>';
+  } else {
+    acertosOrd.forEach(function(a) {
+      const pagoA = calcPagoAcerto(a.id);
+      const agendadoA = calcAgendadoAcerto(a.id);
+      const saldoA = (a.valor||0) - pagoA;
+      const concl = a.status==='concluido';
+      acertosHtml += '<div class="gasto-item">'
+        +'<div class="gasto-icon" style="background:var(--green-light)">🧱</div>'
+        +'<div class="gasto-info">'
+          +'<div class="gi-cat">Etapa '+a.etapa+(concl?' · ✅ Concluído':' · Em andamento')+'</div>'
+          +(a.descricao?'<div class="gi-desc">'+a.descricao+'</div>':'')
+          +'<div class="gi-data">Pago '+r$(pagoA)+' · A pagar '+r$(Math.max(0,saldoA))+(agendadoA>0?' · Agendado '+r$(agendadoA):'')+(saldoA<0?' · Pago a mais '+r$(-saldoA):'')+'</div>'
+          +(a.obs?'<div class="gi-data">'+a.obs+'</div>':'')
+          +'<div class="gasto-actions">'
+            +'<button class="btn-edit" data-aid="'+a.id+'" onclick="pagarAcertoById(this)">💰 Pagar</button>'
+            +'<button class="btn-edit" data-aid="'+a.id+'" onclick="editarAcertoById(this)">✏️ Editar</button>'
+            +'<button class="btn-edit" data-aid="'+a.id+'" onclick="alternarStatusAcertoById(this)">'+(concl?'↩️ Reabrir':'✅ Concluir')+'</button>'
+            +'<button class="btn-del" data-aid="'+a.id+'" onclick="excluirAcertoById(this)">🗑️ Excluir</button>'
+          +'</div>'
+        +'</div>'
+        +'<div class="gasto-valor"><div class="gv-val green">'+r$(a.valor)+'</div></div>'
+      +'</div>';
+    });
   }
 
   mc.innerHTML = '<div class="modal-handle"></div>'
     +'<div class="modal-title">👷 '+nome+'</div>'
-    // Summary cards
-    +'<div class="stats-grid" style="margin-bottom:12px">'
-      +'<div class="stat-card"><div class="sc-label">Total de dias</div><div class="sc-val green">'+todosDoProf.length+'</div></div>'
-      +'<div class="stat-card"><div class="sc-label">Total de horas</div><div class="sc-val green">'+totalHorasTodas+'</div></div>'
+    // Resumo dos acertos
+    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px">'
+      +'<div class="stat-card"><div class="sc-label">Acertado</div><div class="sc-val green" style="font-size:14px">'+r$(resAc.acertado)+'</div></div>'
+      +'<div class="stat-card"><div class="sc-label">Pago</div><div class="sc-val green" style="font-size:14px">'+r$(resAc.pago)+'</div></div>'
+      +'<div class="stat-card"><div class="sc-label">A pagar</div><div class="sc-val red" style="font-size:14px">'+r$(resAc.saldo)+'</div></div>'
     +'</div>'
-    // Monthly summary (collapsible)
-    +'<details style="margin-bottom:12px"><summary style="cursor:pointer;font-size:13px;font-weight:500;color:var(--green-mid);padding:8px 0">📊 Resumo mensal</summary>'
-      +'<div class="card" style="margin-top:8px;padding:8px 12px">'+(resumoMensal||'<p style="color:#999;font-size:13px">Nenhum registro</p>')+'</div>'
-    +'</details>'
     // PDF button
     +'<button data-pnome="'+nome+'" onclick="gerarPDFProfissionalById(this)" style="width:100%;background:var(--green-light);color:var(--green);border:none;border-radius:8px;padding:10px;font-family:DM Sans,sans-serif;font-size:13px;font-weight:500;cursor:pointer;margin-bottom:12px">📄 Gerar PDF</button>'
-    // Period filter
-    +'<div style="display:grid;grid-template-columns:1fr auto;gap:8px;margin-bottom:12px">'
-      +'<select class="form-input" id="det-periodo" style="padding:8px 10px;font-size:13px">'+periodoOpts+'</select>'
-    +'<button id="btn-det-filtrar" style="background:var(--green);color:#fff;border:none;border-radius:8px;padding:0 14px;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap">🔍 Filtrar</button>'
+    // Acertos por etapa
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'
+      +'<div class="section-title" style="margin-bottom:0">Acertos por etapa</div>'
+      +'<button data-prof="'+nome+'" onclick="novoAcertoProfById(this)" style="background:var(--green);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:500;cursor:pointer;font-family:\'DM Sans\',sans-serif">+ Novo acerto</button>'
     +'</div>'
-    // Results info
-    +(filtroPer!=='todos'?'<div style="background:var(--green-light);border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:12px;color:var(--green-mid)">'+registros.length+' registro'+(registros.length!==1?'s':'')+' · '+totalHorasFiltrado+' horas</div>':'')
-    // List
-    +'<div class="modal-scroll-list">'+linhas+'</div>'
+    +acertosHtml
+    // Histórico por horas (antigo) — dados preservados
+    +'<details style="margin:12px 0"'+((filtroPer!=='todos'||limite>10)?' open':'')+'>'
+      +'<summary style="cursor:pointer;font-size:13px;font-weight:500;color:var(--green-mid);padding:8px 0">⏱️ Histórico por horas (antigo) · '+todosDoProf.length+' dia'+(todosDoProf.length!==1?'s':'')+' · '+totalHorasTodas+'</summary>'
+      +'<div style="margin-top:8px">'
+        +'<button onclick="abrirModalRegistroMao()" style="width:100%;background:none;color:var(--text-muted);border:1px dashed var(--border);border-radius:8px;padding:8px;font-family:DM Sans,sans-serif;font-size:12px;cursor:pointer;margin-bottom:12px">+ Registrar dia trabalhado (histórico)</button>'
+        +'<details style="margin-bottom:12px"><summary style="cursor:pointer;font-size:13px;font-weight:500;color:var(--green-mid);padding:8px 0">📊 Resumo mensal</summary>'
+          +'<div class="card" style="margin-top:8px;padding:8px 12px">'+(resumoMensal||'<p style="color:#999;font-size:13px">Nenhum registro</p>')+'</div>'
+        +'</details>'
+        +'<div style="display:grid;grid-template-columns:1fr auto;gap:8px;margin-bottom:12px">'
+          +'<select class="form-input" id="det-periodo" style="padding:8px 10px;font-size:13px">'+periodoOpts+'</select>'
+          +'<button id="btn-det-filtrar" style="background:var(--green);color:#fff;border:none;border-radius:8px;padding:0 14px;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap">🔍 Filtrar</button>'
+        +'</div>'
+        +(filtroPer!=='todos'?'<div style="background:var(--green-light);border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:12px;color:var(--green-mid)">'+registros.length+' registro'+(registros.length!==1?'s':'')+' · '+totalHorasFiltrado+' horas</div>':'')
+        +'<div class="modal-scroll-list">'+linhas+'</div>'
+      +'</div>'
+    +'</details>'
     +'<div class="modal-footer"><button class="btn-fechar" onclick="fecharModal()">✕ Fechar</button></div>';
 
   overlay.classList.add('open');
@@ -1607,7 +1915,13 @@ window.gerarPDFProfissional = function(nome) {
   const totalDias = registros.length;
   const totalHoras = decimalParaHoras(registros.reduce((s,r)=>s+(r.horas||0),0));
   const rows = registros.map((r,i)=>'<tr style="background:'+(i%2===0?'#f9f9f9':'#fff')+'"><td>'+new Date(r.data+'T00:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})+'</td><td style="text-align:center;font-weight:500">'+(r.horasFormatado||decimalParaHoras(r.horas||0))+'</td><td style="color:#666">'+(r.obs||'—')+'</td></tr>').join('');
-  const html = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>'+nome+' - Nossa Casa</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;padding:32px;color:#1a1a1a}h1{color:#5c3d1e;font-size:22px;margin-bottom:4px}.sub{color:#666;font-size:12px;margin-bottom:24px}table{width:100%;border-collapse:collapse;margin-top:16px}th{background:#5c3d1e;color:#fff;padding:9px 12px;text-align:left;font-size:12px}td{padding:8px 12px;border-bottom:1px solid #eee}.totais{margin-top:20px;background:#e8f5f0;border-radius:8px;padding:16px;display:flex;gap:32px}.tot-item .tot-label{font-size:12px;color:#666}.tot-item .tot-val{font-size:20px;font-weight:bold;color:#5c3d1e}.rodape{margin-top:32px;font-size:11px;color:#999;text-align:center}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}</style></head><body><h1>Nossa Casa — '+nome+'</h1><div class="sub">Gerado em '+new Date().toLocaleDateString('pt-BR')+'</div><table><thead><tr><th>Data</th><th style="text-align:center">Horas</th><th>Observação</th></tr></thead><tbody>'+rows+'</tbody></table><div class="totais"><div class="tot-item"><div class="tot-label">Total de dias</div><div class="tot-val">'+totalDias+'</div></div><div class="tot-item"><div class="tot-label">Total de horas</div><div class="tot-val">'+totalHoras+'</div></div></div><div class="rodape">Relatório gerado pelo app Nossa Casa</div><script>window.onload=()=>{window.print()}<\/script></body></html>';
+  const resAcPdf = resumoAcertosProf(nome);
+  const acertosPdfRows = resAcPdf.lista.slice().sort(function(a,b){ return (a.etapa||0)-(b.etapa||0); }).map(function(a,i){
+    const pagoP = calcPagoAcerto(a.id);
+    return '<tr style="background:'+(i%2===0?'#f9f9f9':'#fff')+'"><td>Etapa '+a.etapa+'</td><td>'+(a.descricao||'—')+'</td><td>'+(a.status==='concluido'?'Concluído':'Em andamento')+'</td><td style="text-align:right">'+r$(a.valor)+'</td><td style="text-align:right">'+r$(pagoP)+'</td><td style="text-align:right">'+r$((a.valor||0)-pagoP)+'</td></tr>';
+  }).join('');
+  const acertosPdf = resAcPdf.lista.length===0 ? '' : '<h2 style="margin-top:24px;font-size:15px;color:#5c3d1e">Acertos por etapa</h2><table><thead><tr><th>Etapa</th><th>Descrição</th><th>Status</th><th style="text-align:right">Acertado</th><th style="text-align:right">Pago</th><th style="text-align:right">A pagar</th></tr></thead><tbody>'+acertosPdfRows+'</tbody></table><div class="totais"><div class="tot-item"><div class="tot-label">Total acertado</div><div class="tot-val">'+r$(resAcPdf.acertado)+'</div></div><div class="tot-item"><div class="tot-label">Total pago</div><div class="tot-val">'+r$(resAcPdf.pago)+'</div></div><div class="tot-item"><div class="tot-label">A pagar</div><div class="tot-val">'+r$(resAcPdf.saldo)+'</div></div></div>';
+  const html = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>'+nome+' - Nossa Casa</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;padding:32px;color:#1a1a1a}h1{color:#5c3d1e;font-size:22px;margin-bottom:4px}.sub{color:#666;font-size:12px;margin-bottom:24px}table{width:100%;border-collapse:collapse;margin-top:16px}th{background:#5c3d1e;color:#fff;padding:9px 12px;text-align:left;font-size:12px}td{padding:8px 12px;border-bottom:1px solid #eee}.totais{margin-top:20px;background:#e8f5f0;border-radius:8px;padding:16px;display:flex;gap:32px}.tot-item .tot-label{font-size:12px;color:#666}.tot-item .tot-val{font-size:20px;font-weight:bold;color:#5c3d1e}.rodape{margin-top:32px;font-size:11px;color:#999;text-align:center}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}</style></head><body><h1>Nossa Casa — '+nome+'</h1><div class="sub">Gerado em '+new Date().toLocaleDateString('pt-BR')+'</div>'+acertosPdf+(registros.length?('<h2 style="margin-top:24px;font-size:15px;color:#5c3d1e">Histórico por horas</h2><table><thead><tr><th>Data</th><th style="text-align:center">Horas</th><th>Observação</th></tr></thead><tbody>'+rows+'</tbody></table><div class="totais"><div class="tot-item"><div class="tot-label">Total de dias</div><div class="tot-val">'+totalDias+'</div></div><div class="tot-item"><div class="tot-label">Total de horas</div><div class="tot-val">'+totalHoras+'</div></div></div>'):'')+'<div class="rodape">Relatório gerado pelo app Nossa Casa</div><script>window.onload=()=>{window.print()}<\/script></body></html>';
   const blob = new Blob([html],{type:'text/html'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -1806,7 +2120,7 @@ function renderConfig() {
       <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px">📊 Estatísticas</div>
       <div class="config-item"><span class="config-label">Total de gastos</span><span class="config-val">${gastos.length}</span></div>
       <div class="config-item"><span class="config-label">Aportes próprios</span><span class="config-val">${aportes.length}</span></div>
-      <div class="config-item"><span class="config-label">Registros mão de obra</span><span class="config-val">${diarias.length+serventes.length+maodeobra.length}</span></div>
+      <div class="config-item"><span class="config-label">Registros mão de obra</span><span class="config-val">${diarias.length+serventes.length+maodeobra.length+acertos.length}</span></div>
       <div class="config-item"><span class="config-label">Etapas liberadas</span><span class="config-val">${etapas.filter(e=>e.liberado).length} / 12</span></div>
       <div class="config-item"><span class="config-label">Tarefas cadastradas</span><span class="config-val">${tarefas.length}</span></div>
     </div>
@@ -1946,6 +2260,13 @@ window.abrirModalGasto = function(id) {
   const g = id ? gastos.find(x=>x.id===id) : null;
   const overlay = document.getElementById('modal-overlay');
   const content = document.getElementById('modal-content');
+  const pre = (!id && window._prefillGasto) ? window._prefillGasto : null;
+  window._prefillGasto = null;
+  const profSelGasto = g ? (g.profissional||'') : '';
+  const listaProfGasto = listaProfissionaisTodos();
+  if(profSelGasto && !listaProfGasto.includes(profSelGasto)) listaProfGasto.push(profSelGasto);
+  let optsProfGasto = '';
+  listaProfGasto.forEach(function(p) { optsProfGasto += '<option value="'+p+'"'+(p===profSelGasto?' selected':'')+'>'+p+'</option>'; });
   content.innerHTML = `
     <div class="modal-handle"></div>
     <div class="modal-title">${g?'Editar gasto':'Novo gasto'}</div>
@@ -1962,9 +2283,9 @@ window.abrirModalGasto = function(id) {
     <div id="campo-profissional" style="display:none">
       <div class="form-group">
         <label class="form-label">Profissional</label>
-        <select class="form-input" id="f-profissional" onchange="toggleNovoProfissional()">
+        <select class="form-input" id="f-profissional" onchange="toggleNovoProfissional();atualizarOpcoesAcerto()">
           <option value="">Selecione...</option>
-          ${profissionais.map(p=>`<option value="${p}" ${g&&g.profissional===p?'selected':''}>${p}</option>`).join('')}
+          ${optsProfGasto}
           <option value="__novo__">+ Adicionar novo</option>
         </select>
       </div>
@@ -1973,6 +2294,10 @@ window.abrirModalGasto = function(id) {
           <label class="form-label">Nome do profissional</label>
           <input class="form-input" id="f-novo-prof" type="text" placeholder="Ex: Pintor">
         </div>
+      </div>
+      <div class="form-group" id="campo-acerto" style="display:none">
+        <label class="form-label">Acerto / etapa (opcional)</label>
+        <select class="form-input" id="f-acerto"><option value="">Sem vínculo</option></select>
       </div>
     </div>
     <div class="form-group">
@@ -2017,7 +2342,14 @@ window.abrirModalGasto = function(id) {
   overlay.classList.add('open');
   toggleParcelas();
   toggleProfissional();
-  if(g && g.categoria === 'mao_obra') setTimeout(()=>{ const s = document.getElementById('f-profissional'); if(s && g.profissional) s.value = g.profissional; },50);
+  if(g && g.categoria === 'mao_obra') setTimeout(()=>{ const s = document.getElementById('f-profissional'); if(s && g.profissional) s.value = g.profissional; atualizarOpcoesAcerto(g.acertoId); },50);
+  if(pre) {
+    const fc = document.getElementById('f-cat'); if(fc) fc.value = 'mao_obra';
+    toggleProfissional();
+    const fp = document.getElementById('f-profissional'); if(fp) fp.value = pre.profissional||'';
+    atualizarOpcoesAcerto(pre.acertoId);
+    const fd = document.getElementById('f-desc'); if(fd && pre.descricao) fd.value = pre.descricao;
+  }
   setupMoeda('f-valor');
   document.getElementById('f-valor')?.addEventListener('input', ()=>updateParcelaInfo());
   document.getElementById('f-nparcelas')?.addEventListener('change', ()=>updateParcelaInfo());
@@ -2147,8 +2479,10 @@ async function salvarGasto() {
   }
 
   let profissional = '';
+  let acertoId = '';
   if(cat === 'mao_obra') {
     const profSel = document.getElementById('f-profissional')?.value;
+    if(profSel !== '__novo__') acertoId = document.getElementById('f-acerto')?.value || '';
     if(profSel === '__novo__') {
       const novo = document.getElementById('f-novo-prof')?.value.trim();
       if(novo) { profissional = novo; if(!profissionais.includes(novo)) profissionais.push(novo); }
@@ -2158,7 +2492,7 @@ async function salvarGasto() {
   const payload = {
     valor, categoria:cat, descricao:desc, data, status,
     formaPagamento:pgto, totalParcelas, parcelas,
-    profissional,
+    profissional, acertoId,
     quem: currentUser.displayName||currentUser.email.split('@')[0],
     uid: currentUser.uid,
     criadoEm: new Date().toISOString(),
@@ -2263,6 +2597,11 @@ function subscribeData() {
   });
   unsubMaodeobra = onSnapshot(collection(db,'maodeobra'), snap=>{
     maodeobra = snap.docs.map(d=>({id:d.id,...d.data()}));
+    render();
+  });
+  if(unsubAcertos) unsubAcertos();
+  unsubAcertos = onSnapshot(collection(db,'acertos'), snap=>{
+    acertos = snap.docs.map(d=>({id:d.id,...d.data()}));
     render();
   });
   // Load infoObra
@@ -2381,6 +2720,7 @@ window.exportarBackup = async function() {
       diarias,
       serventes,
       maodeobra,
+      acertos,
       aportes,
       tarefas
     };
@@ -2446,6 +2786,12 @@ window.importarBackup = async function(event) {
       for(const a of (backup.aportes||[])) {
         const {id, ...dados} = a;
         await addDoc(collection(db,'aportes'), {...dados, restauradoEm: new Date().toISOString()});
+        importados++;
+      }
+      for(const ac of (backup.acertos||[])) {
+        const {id, ...dados} = ac;
+        if(!id) continue;
+        await setDoc(doc(db,'acertos',id), {...dados, restauradoEm: new Date().toISOString()});
         importados++;
       }
       showToast(`Backup restaurado! ${importados} registros importados.`);
@@ -2741,7 +3087,7 @@ window.gerarPDFGeral = function() {
   const porCat={}; gastos.forEach(g=>{porCat[g.categoria]=(porCat[g.categoria]||0)+(g.valor||0);});
   const catRows=Object.entries(porCat).sort((a,b)=>b[1]-a[1]).map(([cat,val])=>{const c=getCat(cat);return `<tr><td>${c.icon} ${c.label}</td><td>${r$(val)}</td><td>${s.totalPago>0?Math.round(val/s.totalPago*100):0}%</td></tr>`;}).join('');
   const body=`<h2>Entradas</h2><div class="rg"><div class="rc green"><div class="rl">Caixa Econômica (bruto)</div><div class="rv">${r$(s.totalCaixaBruto)}</div></div><div class="rc red"><div class="rl">Taxas Caixa</div><div class="rv">${r$(s.totalTaxasEtapas)}</div></div><div class="rc green"><div class="rl">Recursos próprios</div><div class="rv">${r$(s.totalAportesProprios)}</div></div><div class="rc green"><div class="rl">Total de entradas</div><div class="rv">${r$(s.totalEntradas)}</div></div></div><h2>Saídas</h2><div class="rg"><div class="rc red"><div class="rl">Total já pago</div><div class="rv">${r$(s.totalPago)}</div></div><div class="rc red"><div class="rl">Total de taxas</div><div class="rv">${r$(s.totalTaxas)}</div></div><div class="rc amber"><div class="rl">Parcelas em aberto</div><div class="rv">${r$(s.parcelasFuturas)}</div></div><div class="rc amber"><div class="rl">Pendentes</div><div class="rv">${r$(s.totalPendente)}</div></div><div class="rc red"><div class="rl">Total comprometido</div><div class="rv">${r$(s.totalComprometido)}</div></div></div><h2>Gastos por categoria</h2><table><thead><tr><th>Categoria</th><th>Total</th><th>% do pago</th></tr></thead><tbody>${catRows}</tbody></table><h2>Etapas Caixa (${el.length} de 12 liberadas)</h2>${el.length===0?'<p style="color:#999;padding:12px 0">Nenhuma etapa liberada ainda.</p>':`<table><thead><tr><th>Etapa</th><th>Data</th><th>Bruto</th><th>Taxas</th><th>Líquido</th></tr></thead><tbody>${el.map(e=>`<tr><td>Etapa ${e.numero}</td><td>${fmtData(e.data)}</td><td>${r$(e.valorBruto||0)}</td><td>${r$(e.taxas||0)}</td><td style="color:#8b5e3c;font-weight:700">${r$((e.valorBruto||0)-(e.taxas||0))}</td></tr>`).join('')}</tbody></table>`}<h2>Mão de obra</h2><div class="rg"><div class="rc"><div class="rl">👷 Pedreiro — Dias</div><div class="rv">${tdp}</div></div><div class="rc"><div class="rl">👷 Pedreiro — Horas</div><div class="rv">${thp}</div></div><div class="rc"><div class="rl">🧱 Servente — Dias</div><div class="rv">${tds}</div></div><div class="rc"><div class="rl">🧱 Servente — Horas</div><div class="rv">${ths}</div></div></div>`;
-  gerarPDF('Relatório Geral Completo', body);
+  gerarPDF('Relatório Geral Completo', body + htmlAcertosPdfGeral());
 };
 
 
@@ -3588,6 +3934,7 @@ window.fazerLogout = async function() {
   if(unsubAportes) unsubAportes();
   if(unsubTarefas) unsubTarefas();
   if(unsubMaodeobra) unsubMaodeobra();
+  if(unsubAcertos) unsubAcertos();
   await signOut(auth);
 };
 
