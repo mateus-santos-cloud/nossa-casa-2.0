@@ -1372,7 +1372,21 @@ window.editarTarefa = function(id, etapaNum) {
   };
 };
 
-// Proteção geral para qualquer campo de data do app: só aceita ano válido (2000 a 2100)
+// ===================== PROTEÇÃO DE DATAS (TODO O APP) =====================
+// Qualquer campo de data só pode ter ano com 4 dígitos entre 2000 e 2100.
+// 1) ao digitar: o 5º dígito do ano é cortado e ano fora do intervalo fica com a borda vermelha
+// 2) ao sair do campo: data inválida ou incompleta é limpa, com aviso
+// 3) ao tocar em qualquer botão de salvar/confirmar: se houver data inválida na tela, o botão é bloqueado
+function dataCampoInvalida(el) {
+  if(!el) return false;
+  if(el.validity && el.validity.badInput) return true;
+  return !!el.value && !dataIsoValida(el.value);
+}
+
+function marcarDataInvalida(el, invalida) {
+  el.style.borderColor = invalida ? 'var(--red)' : '';
+}
+
 document.addEventListener('focusin', function(e) {
   const el = e.target;
   if(el && el.type==='date') {
@@ -1380,13 +1394,47 @@ document.addEventListener('focusin', function(e) {
     if(!el.max) el.max = '2100-12-31';
   }
 });
+
+document.addEventListener('input', function(e) {
+  const el = e.target;
+  if(!el || el.type!=='date') return;
+  if(el.value) {
+    const partes = el.value.split('-');
+    if(partes[0] && partes[0].length > 4) {
+      partes[0] = partes[0].slice(0,4);
+      el.value = partes.join('-');
+    }
+  }
+  marcarDataInvalida(el, !!el.value && !dataIsoValida(el.value));
+});
+
 document.addEventListener('focusout', function(e) {
   const el = e.target;
-  if(el && el.type==='date' && el.value && !dataIsoValida(el.value)) {
+  if(el && el.type==='date' && dataCampoInvalida(el)) {
     el.value = '';
-    showToast('Data inválida: use um ano entre 2000 e 2100');
+    marcarDataInvalida(el, false);
+    showToast('Data inválida: use um ano com 4 dígitos entre 2000 e 2100');
   }
 });
+
+document.addEventListener('click', function(e) {
+  const btn = e.target && e.target.closest ? e.target.closest('button') : null;
+  if(!btn) return;
+  if(btn.closest('#confirm-overlay')) return;
+  if(btn.classList.contains('btn-secondary') || btn.classList.contains('btn-fechar') || btn.classList.contains('btn-del') || /cancelar/i.test(btn.id||'')) return;
+  const noModal = btn.closest('#modal-content');
+  const campos = noModal
+    ? Array.from(noModal.querySelectorAll('input[type="date"]'))
+    : Array.from(document.querySelectorAll('#app input[type="date"]')).filter(function(el){ return !el.closest('#modal-overlay'); });
+  const ruim = campos.find(dataCampoInvalida);
+  if(ruim) {
+    e.preventDefault();
+    e.stopPropagation();
+    marcarDataInvalida(ruim, true);
+    showToast('Corrija a data: use um ano com 4 dígitos entre 2000 e 2100');
+    try { ruim.focus(); } catch(err) {}
+  }
+}, true);
 
 // ===================== ETAPAS / PROGRESSO: AJUDANTES VISUAIS =====================
 // Linha de mão de obra dentro de cada etapa (acertado e pago), calculada a partir dos acertos
@@ -3684,32 +3732,42 @@ window.abrirTarefasEtapa = function(num) {
       </div>
       <div style="font-size:11px;color:var(--text-muted)">${prog.total===0?'Nenhuma tarefa ainda':prog.concluidas+' de '+prog.total+' tarefas concluídas'}</div>
     </div>
-    <div class="section-title">Tarefas</div>
-    <div class="modal-scroll-list">${linhasTarefas}</div>
-    <div style="margin-top:12px">
-      <div class="form-group">
-        <label class="form-label">Nome da tarefa</label>
-        <input class="form-input" id="nova-tarefa-nome-${num}" type="text" placeholder="Ex: Concretagem da laje">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Data de início</label>
-        <input class="form-input" id="nova-tarefa-inicio-${num}" type="date" min="2000-01-01" max="2100-12-31" value="${hojeLocal()}" onchange="ajustarMinPrevisao(${num})">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Data prevista de conclusão (opcional)</label>
-        <input class="form-input" id="nova-tarefa-previsao-${num}" type="date" min="${hojeLocal()}" max="2100-12-31">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Observação (opcional)</label>
-        <input class="form-input" id="nova-tarefa-obs-${num}" type="text" placeholder="Detalhes...">
-      </div>
-      <button class="btn-primary" onclick="adicionarTarefa(${num})" style="margin-top:0">+ Adicionar tarefa</button>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <div class="section-title" style="margin-bottom:0">Tarefas</div>
+      <button onclick="abrirModalNovaTarefa(${num})" style="background:var(--green);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif">+ Nova tarefa</button>
     </div>
+    <div class="modal-scroll-list">${linhasTarefas}</div>
     <div class="modal-footer" style="gap:8px">
       <button onclick="gerarPDFEtapaTarefas(${num})" style="background:var(--green-light);color:var(--green);border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif">📄 PDF</button>
       <button class="btn-fechar" onclick="fecharModal();setTimeout(abrirProgressoObra,200)">‹ Voltar</button>
     </div>
   `;
+  overlay.classList.add('open');
+};
+
+window.abrirModalNovaTarefa = function(num) {
+  const overlay = document.getElementById('modal-overlay');
+  const mc = document.getElementById('modal-content');
+  mc.innerHTML = '<div class="modal-handle"></div>'
+    +'<div class="modal-title">Nova tarefa — Etapa '+num+'</div>'
+    +'<div class="form-group">'
+      +'<label class="form-label">Nome da tarefa</label>'
+      +'<input class="form-input" id="nova-tarefa-nome-'+num+'" type="text" placeholder="Ex: Concretagem da laje">'
+    +'</div>'
+    +'<div class="form-group">'
+      +'<label class="form-label">Data de início</label>'
+      +'<input class="form-input" id="nova-tarefa-inicio-'+num+'" type="date" min="2000-01-01" max="2100-12-31" value="'+hojeLocal()+'" onchange="ajustarMinPrevisao('+num+')">'
+    +'</div>'
+    +'<div class="form-group">'
+      +'<label class="form-label">Data prevista de conclusão (opcional)</label>'
+      +'<input class="form-input" id="nova-tarefa-previsao-'+num+'" type="date" min="'+hojeLocal()+'" max="2100-12-31">'
+    +'</div>'
+    +'<div class="form-group">'
+      +'<label class="form-label">Observação (opcional)</label>'
+      +'<input class="form-input" id="nova-tarefa-obs-'+num+'" type="text" placeholder="Detalhes...">'
+    +'</div>'
+    +'<button class="btn-primary" onclick="adicionarTarefa('+num+')">Adicionar tarefa</button>'
+    +'<button class="btn-secondary" onclick="abrirTarefasEtapa('+num+')">Cancelar</button>';
   overlay.classList.add('open');
 };
 
