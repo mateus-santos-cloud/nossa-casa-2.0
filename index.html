@@ -262,6 +262,7 @@ let diarias = [];
 let serventes = [];
 let maodeobra = [];
 let acertos = [];
+let pagamentosEmp = [];
 let aportes = [];
 let tarefas = [];
 let profissionaisMao = ['Pedreiro','Servente','Eletricista','Encanador','Pintor','Gesseiro','Marmorista','Marceneiro','Serralheiro','Outros'];
@@ -269,6 +270,7 @@ let unsubDiarias = null;
 let unsubServentes = null;
 let unsubMaodeobra = null;
 let unsubAcertos = null;
+let unsubPagEmp = null;
 let unsubAportes = null;
 let unsubTarefas = null;
 let profissionais = [...PROFISSIONAIS_PADRAO];
@@ -463,45 +465,6 @@ window.abrirResumoCaixa = function() {
   overlay.classList.add('open');
 };
 
-window.abrirResumoAportes = function() {
-  const overlay = document.getElementById('modal-overlay');
-  const mc = document.getElementById('modal-content');
-  const aportesOrdenados = [...aportes].sort((a,b)=>new Date(b.data)-new Date(a.data));
-  const total = aportesOrdenados.reduce((s,a)=>s+(a.valor||0),0);
-  const linhas = aportesOrdenados.length === 0
-    ? `<div class="empty"><div class="empty-icon">💵</div><p>Nenhum aporte registrado ainda</p></div>`
-    : aportesOrdenados.map(a => {
-        const data = a.data ? new Date(a.data+'T00:00:00').toLocaleDateString('pt-BR') : '—';
-        return `<div class="gasto-item">
-          <div class="gasto-icon" style="background:#e8f2fb">💵</div>
-          <div class="gasto-info">
-            <div class="gi-cat">${a.descricao||'Aporte próprio'}</div>
-            <div class="gi-data">Data: ${data} · ${a.quem||''}</div>
-            <div class="gasto-actions">
-              <button class="btn-del" onclick="confirmarExcluirAporte('${a.id}')">🗑️ Excluir</button>
-            </div>
-          </div>
-          <div class="gasto-valor">
-            <div class="gv-val green">${fmtR(a.valor||0)}</div>
-          </div>
-        </div>`;
-      }).join('');
-  mc.innerHTML = `
-    <div class="modal-handle"></div>
-    <div class="modal-title">Recursos próprios</div>
-    <div class="card" style="margin-bottom:12px;padding:12px 16px">
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <span style="font-size:13px;font-weight:500">Total investido</span>
-        <span style="font-size:17px;font-weight:500;color:var(--green-mid)">${fmtR(total)}</span>
-      </div>
-    </div>
-    ${linhas}
-    <button class="btn-primary" onclick="fecharModal();setTimeout(abrirModalAporte,200)" style="margin-top:12px">+ Registrar novo aporte</button>
-    <div class="modal-footer" style="gap:8px"><button onclick="gerarPDFAportes()" style="background:var(--green-light);color:var(--green);border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif">📄 PDF Recursos próprios</button><button class="btn-fechar" onclick="fecharModal()">✕ Fechar</button></div>
-  `;
-  overlay.classList.add('open');
-};
-
 window.confirmarExcluirAporte = function(id) {
   showConfirm({
     titulo: 'Excluir aporte',
@@ -521,7 +484,8 @@ window.abrirResumoEntradas = function() {
   const totalBruto = etapasLib.reduce((s,e)=>s+(e.valorBruto||0),0);
   const totalTaxas = etapasLib.reduce((s,e)=>s+(e.taxas||0),0);
   const totalLiqCaixa = totalBruto - totalTaxas;
-  const totalAportes = aportes.reduce((s,a)=>s+(a.valor||0),0);
+  const recProp = calcRecursosProprios();
+  const totalAportes = recProp.total;
   const totalGeral = totalBruto + totalAportes;
   const totalGeralLiq = totalLiqCaixa + totalAportes;
 
@@ -589,6 +553,7 @@ window.abrirResumoEntradas = function() {
     <div class="section-title">💰 Caixa Econômica — por etapa</div>
     ${linhasEtapas}
     <div class="section-title" style="margin-top:16px">💵 Recursos próprios — por aporte</div>
+    ${linhasOrigemEntradas(recProp)}
     ${linhasAportes}
     <div class="modal-footer" style="gap:8px"><button onclick="gerarPDFPendentes()" style="background:var(--green-light);color:var(--green);border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif">📄 PDF Pendentes</button><button class="btn-fechar" onclick="fecharModal()">✕ Fechar</button></div>
   `;
@@ -751,7 +716,7 @@ function calcProgressoGeral() {
 function calcSaldos() {
   const totalCaixaBruto = etapas.filter(e=>e.liberado).reduce((s,e)=>s+(e.valorBruto||0),0);
   const totalTaxasEtapas = etapas.filter(e=>e.liberado).reduce((s,e)=>s+(e.taxas||0),0);
-  const totalAportesProprios = aportes.reduce((s,a)=>s+(a.valor||0),0);
+  const totalAportesProprios = calcRecursosProprios().total;
   const totalEntradas = totalCaixaBruto + totalAportesProprios;
   const totalPago = gastos.filter(g=>g.status==='pago').reduce((s,g)=>s+(g.valor||0),0);
   const totalPendente = gastos.filter(g=>g.status==='pendente').reduce((s,g)=>s+(g.valor||0),0);
@@ -1004,10 +969,11 @@ function renderGastoItem(g, showActions=true) {
     <div class="gasto-info">
       <div class="gi-cat">${cat.label}</div>
       <div class="gi-desc">${g.categoria==='mao_obra'&&g.profissional ? g.profissional + (g.descricao?' · '+g.descricao:'') : g.descricao||'—'}</div>
-      <div class="gi-data">${data} · ${g.quem||''}</div>
+      <div class="gi-data">${data} · ${g.quem||''}${origemGasto(g)!=='caixa'?' · '+rotuloOrigem(g):''}</div>
       ${showActions?`<div class="gasto-actions">
         <button class="btn-edit" onclick="editarGasto('${g.id}')">✏️ Editar</button>
         <button class="btn-edit" onclick="duplicarGasto('${g.id}')">📋 Duplicar</button>
+        <button class="btn-edit" data-gid="${g.id}" onclick="abrirOrigemGastoById(this)">${rotuloOrigemCurto(g)}</button>
         <button class="btn-del" onclick="deletarGasto('${g.id}')">🗑️ Excluir</button>
       </div>`:''}
     </div>
@@ -1244,6 +1210,7 @@ function renderEtapaItem(num, et) {
       +'<div style="font-size:11px;color:var(--text-muted);margin-top:6px">📅 Liberação: '+data+'</div>'
       +(et.obs?'<div style="font-size:11px;color:var(--text-muted);margin-top:2px">📝 '+et.obs+'</div>':'')
       +'<div style="font-size:10px;color:var(--text-hint);margin-top:4px;padding-top:4px;border-top:1px solid var(--border)">Cadastrado: '+criadoEm+' · por: '+quem+'</div>'
+      +linhaMaoObraEtapa(num)
       +'<div class="gasto-actions">'
         +'<button class="btn-edit" onclick="abrirTarefasEtapa('+num+')">📋 Tarefas</button>'
         +(etId?'<button class="btn-del" data-eid="'+etId+'" onclick="deletarEtapaById(this)">🗑️ Excluir</button>':'')
@@ -1254,6 +1221,7 @@ function renderEtapaItem(num, et) {
       +'<div class="etapa-header"><div class="etapa-name">Etapa '+num+'</div><span class="etapa-badge '+statusClass+'">'+statusVisual+'</span></div>'
       +'<div style="font-size:12px;color:var(--text-hint);margin-top:4px">Aguardando liberação da Caixa</div>'
       +(valorPrevisto>0?'<div style="font-size:12px;color:var(--amber);margin-top:4px;font-weight:500">Previsão bruta: '+fmtR(valorPrevisto)+(et&&et.taxasPrevistas?'<br><span style="font-size:11px;color:var(--red)">Taxas estimadas: '+fmtR(et.taxasPrevistas||0)+'</span><br><span style="font-size:11px;color:var(--green-mid);font-weight:600">Líquido previsto: '+fmtR((et.liquidoPrevisto||valorPrevisto))+'</span>':'')+'</div>':'')
+      +linhaMaoObraEtapa(num)
       +'<div class="gasto-actions">'
         +'<button class="btn-edit" onclick="abrirTarefasEtapa('+num+')">📋 Tarefas</button>'
         +'<button class="btn-edit" onclick="abrirModalPrevisaoEtapa('+num+')">💰 Previsão</button>'
@@ -1263,6 +1231,485 @@ function renderEtapaItem(num, et) {
   }
 }
 
+
+// ===================== TAREFAS: DATAS, PREVISÃO E ATRASO =====================
+function hojeLocal() {
+  const d = new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+
+// Data ISO (aaaa-mm-dd) real e com ano de 4 dígitos entre 2000 e 2100
+function dataIsoValida(s) {
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(s||'')) return false;
+  const p = s.split('-').map(Number);
+  if(p[0]<2000 || p[0]>2100) return false;
+  const dt = new Date(p[0], p[1]-1, p[2]);
+  return dt.getFullYear()===p[0] && dt.getMonth()===p[1]-1 && dt.getDate()===p[2];
+}
+
+function fmtDataBR(s) {
+  return s ? new Date(s+'T00:00:00').toLocaleDateString('pt-BR') : '';
+}
+
+function diasEntre(a, b) {
+  return Math.round((new Date(b+'T00:00:00') - new Date(a+'T00:00:00')) / 86400000);
+}
+
+// Devolve a mensagem de erro (ou '' se estiver tudo certo)
+function validarDatasTarefa(inicio, previsao, conclusao) {
+  if(!dataIsoValida(inicio)) return 'Data de início inválida (use um ano entre 2000 e 2100)';
+  if(previsao) {
+    if(!dataIsoValida(previsao)) return 'Previsão de conclusão inválida (use um ano entre 2000 e 2100)';
+    if(previsao < inicio) return 'A previsão de conclusão não pode ser anterior ao início da tarefa';
+  }
+  if(conclusao) {
+    if(!dataIsoValida(conclusao)) return 'Data de conclusão inválida (use um ano entre 2000 e 2100)';
+    if(conclusao < inicio) return 'A data de conclusão não pode ser anterior ao início da tarefa';
+  }
+  return '';
+}
+
+function tarefaAtrasada(t) {
+  return !t.concluida && !!t.dataPrevista && t.dataPrevista < hojeLocal();
+}
+
+function tarefaDatasHtml(t) {
+  const partes = [];
+  if(t.dataInicio) partes.push('Início: '+fmtDataBR(t.dataInicio));
+  let extra = '';
+  if(t.concluida) {
+    if(t.dataPrevista) partes.push('Previsto: '+fmtDataBR(t.dataPrevista));
+    if(t.concluidaEm) partes.push('Concluído: '+fmtDataBR(t.concluidaEm));
+    if(t.dataPrevista && t.concluidaEm && t.concluidaEm > t.dataPrevista) {
+      const n = diasEntre(t.dataPrevista, t.concluidaEm);
+      extra = '<div style="color:var(--red);font-size:11px;margin-top:2px">⏰ Concluída com '+n+' dia'+(n!==1?'s':'')+' de atraso</div>';
+    }
+  } else if(t.dataPrevista) {
+    partes.push('Conclusão prevista: '+fmtDataBR(t.dataPrevista));
+    if(tarefaAtrasada(t)) {
+      const n = diasEntre(t.dataPrevista, hojeLocal());
+      extra = '<div style="color:var(--red);font-size:11px;margin-top:2px">⚠️ Atrasada há '+n+' dia'+(n!==1?'s':'')+'</div>';
+    }
+  }
+  return partes.join(' · ')+extra;
+}
+
+function tarefaStatusTxt(t) {
+  if(t.concluida) return '✅ Feito';
+  if(tarefaAtrasada(t)) return '⚠️ Atrasada';
+  return 'Pendente';
+}
+
+function tarefaCorStatus(t) {
+  if(t.concluida) return 'var(--green-mid)';
+  if(tarefaAtrasada(t)) return 'var(--red)';
+  return 'var(--text-hint)';
+}
+
+// Ao mudar a data de início, a previsão não pode ficar antes dela
+window.ajustarMinPrevisao = function(num) {
+  const ini = document.getElementById('nova-tarefa-inicio-'+num);
+  const prev = document.getElementById('nova-tarefa-previsao-'+num);
+  if(ini && prev && ini.value) prev.min = ini.value;
+};
+
+window.editarTarefa = function(id, etapaNum) {
+  const t = tarefas.find(x=>x.id===id);
+  if(!t) { showToast('Tarefa não encontrada.'); return; }
+  const overlay = document.getElementById('modal-overlay');
+  const mc = document.getElementById('modal-content');
+  const atr = 'min="2000-01-01" max="2100-12-31"';
+  mc.innerHTML = ''
+    +'<div class="modal-handle"></div>'
+    +'<div class="modal-title">Editar tarefa</div>'
+    +'<div class="form-group">'
+      +'<label class="form-label">Nome da tarefa</label>'
+      +'<input class="form-input" id="edit-tarefa-nome" type="text">'
+    +'</div>'
+    +'<div class="form-group">'
+      +'<label class="form-label">Data de início</label>'
+      +'<input class="form-input" id="edit-tarefa-inicio" type="date" '+atr+' value="'+(t.dataInicio||'')+'">'
+    +'</div>'
+    +'<div class="form-group">'
+      +'<label class="form-label">Data prevista de conclusão (opcional)</label>'
+      +'<input class="form-input" id="edit-tarefa-previsao" type="date" '+atr+' value="'+(t.dataPrevista||'')+'">'
+    +'</div>'
+    +(t.concluida
+      ? '<div class="form-group">'
+          +'<label class="form-label">Data de conclusão</label>'
+          +'<input class="form-input" id="edit-tarefa-conclusao" type="date" '+atr+' value="'+(t.concluidaEm||'')+'">'
+        +'</div>'
+      : '')
+    +'<div class="form-group">'
+      +'<label class="form-label">Observação (opcional)</label>'
+      +'<input class="form-input" id="edit-tarefa-obs" type="text">'
+    +'</div>'
+    +'<button class="btn-primary" id="btn-salvar-edicao-tarefa">Salvar alterações</button>'
+    +'<button class="btn-secondary" onclick="fecharModal();setTimeout(()=>abrirTarefasEtapa('+etapaNum+'),200)">Cancelar</button>';
+  document.getElementById('edit-tarefa-nome').value = t.nome||'';
+  document.getElementById('edit-tarefa-obs').value = t.obs||'';
+  overlay.classList.add('open');
+  document.getElementById('btn-salvar-edicao-tarefa').onclick = async () => {
+    const nome = document.getElementById('edit-tarefa-nome').value.trim();
+    const inicio = document.getElementById('edit-tarefa-inicio').value;
+    const previsao = document.getElementById('edit-tarefa-previsao').value;
+    const conclEl = document.getElementById('edit-tarefa-conclusao');
+    const conclusao = conclEl ? conclEl.value : '';
+    const obs = document.getElementById('edit-tarefa-obs').value.trim();
+    if(!nome) { showToast('Digite o nome da tarefa'); return; }
+    if(!inicio) { showToast('Informe a data de início'); return; }
+    if(t.concluida && !conclusao) { showToast('Informe a data de conclusão'); return; }
+    const erro = validarDatasTarefa(inicio, previsao, conclusao);
+    if(erro) { showToast(erro); return; }
+    const dados = { nome: nome, dataInicio: inicio, dataPrevista: previsao, obs: obs };
+    if(t.concluida) dados.concluidaEm = conclusao;
+    try {
+      await updateDoc(doc(db,'tarefas',id), dados);
+      showToast('Tarefa atualizada!');
+      fecharModal();
+      setTimeout(()=>abrirTarefasEtapa(etapaNum), 200);
+    } catch(e) { showToast('Erro ao atualizar.'); console.error(e); }
+  };
+};
+
+// Proteção geral para qualquer campo de data do app: só aceita ano válido (2000 a 2100)
+document.addEventListener('focusin', function(e) {
+  const el = e.target;
+  if(el && el.type==='date') {
+    if(!el.min) el.min = '2000-01-01';
+    if(!el.max) el.max = '2100-12-31';
+  }
+});
+document.addEventListener('focusout', function(e) {
+  const el = e.target;
+  if(el && el.type==='date' && el.value && !dataIsoValida(el.value)) {
+    el.value = '';
+    showToast('Data inválida: use um ano entre 2000 e 2100');
+  }
+});
+
+// ===================== ETAPAS / PROGRESSO: AJUDANTES VISUAIS =====================
+// Linha de mão de obra dentro de cada etapa (acertado e pago), calculada a partir dos acertos
+function linhaMaoObraEtapa(num) {
+  const lista = acertos.filter(function(a){ return a.etapa===num; });
+  if(lista.length===0) return '';
+  const acertado = lista.reduce(function(s,a){ return s+(a.valor||0); }, 0);
+  const pago = lista.reduce(function(s,a){ return s+calcPagoAcerto(a.id); }, 0);
+  return '<div style="font-size:11px;color:var(--text-muted);margin-top:6px">🔨 Mão de obra: acertado '+fmtR(acertado)+' · pago '+fmtR(pago)+'</div>';
+}
+
+// Duas etiquetas por etapa no Progresso da Obra: situação das tarefas + situação na Caixa
+function etapaBadgesProgresso(prog, liberada) {
+  let sit;
+  if(prog.total>0 && prog.pct===100) sit = ['🏆 Concluída','var(--green-light)','var(--green-mid)'];
+  else if(prog.pct>0) sit = ['🔨 Em andamento','var(--amber-light)','var(--amber)'];
+  else if(prog.total>0) sit = ['📋 Planejada','var(--amber-light)','var(--amber)'];
+  else sit = ['⏳ Não iniciada','var(--border)','var(--text-muted)'];
+  const lib = liberada
+    ? ['✅ Liberada','var(--green-light)','var(--green-mid)']
+    : ['🔒 Bloqueada','var(--red-light)','var(--red)'];
+  return [sit, lib].map(function(b) {
+    return '<span style="font-size:10px;background:'+b[1]+';color:'+b[2]+';padding:2px 7px;border-radius:10px;font-weight:500;white-space:nowrap">'+b[0]+'</span>';
+  }).join('');
+}
+
+// ===================== ORIGEM DO DINHEIRO (CAIXA / MEU DINHEIRO / EMPRÉSTIMO) =====================
+// gasto.origem = 'proprio' | 'emprestimo' (sem marcação = Caixa). gasto.emprestimoDe = nome de quem emprestou.
+// Pagamentos do empréstimo ficam na coleção 'pagamentosEmprestimo' e NÃO são gastos (só abatem o saldo devedor).
+function origemGasto(g) {
+  return (g && (g.origem==='proprio' || g.origem==='emprestimo')) ? g.origem : 'caixa';
+}
+
+function rotuloOrigemCurto(g) {
+  const o = origemGasto(g);
+  if(o==='proprio') return '💰 Meu dinheiro';
+  if(o==='emprestimo') return '🤝 Empréstimo';
+  return '🏦 Caixa';
+}
+
+function rotuloOrigem(g) {
+  const o = origemGasto(g);
+  if(o==='emprestimo') return '🤝 Empréstimo'+(g.emprestimoDe ? ' ('+g.emprestimoDe+')' : '');
+  return rotuloOrigemCurto(g);
+}
+
+// Recursos próprios = aportes manuais antigos + gastos pagos marcados como meu dinheiro ou empréstimo
+function calcRecursosProprios() {
+  const soma = function(lista){ return lista.reduce(function(s,g){ return s+(g.valor||0); }, 0); };
+  const aportesManuais = soma(aportes);
+  const proprio = soma(gastos.filter(function(g){ return g.origem==='proprio' && g.status==='pago'; }));
+  const emprestimo = soma(gastos.filter(function(g){ return g.origem==='emprestimo' && g.status==='pago'; }));
+  return {aportesManuais:aportesManuais, proprio:proprio, emprestimo:emprestimo, total:aportesManuais+proprio+emprestimo};
+}
+
+function listaCredores() {
+  const nomes = [];
+  gastos.forEach(function(g){ if(g.origem==='emprestimo' && g.emprestimoDe && !nomes.includes(g.emprestimoDe)) nomes.push(g.emprestimoDe); });
+  pagamentosEmp.forEach(function(p){ if(p.credor && !nomes.includes(p.credor)) nomes.push(p.credor); });
+  return nomes.sort(function(a,b){ return a.localeCompare(b); });
+}
+
+function opcoesCredoresHtml() {
+  return listaCredores().map(function(n){ return '<option value="'+n+'"></option>'; }).join('');
+}
+
+function resumoEmprestimo(credor) {
+  const gs = gastos.filter(function(g){ return g.origem==='emprestimo' && g.emprestimoDe===credor; })
+    .sort(function(a,b){ return new Date(b.data)-new Date(a.data); });
+  const emprestado = gs.filter(function(g){ return g.status==='pago'; }).reduce(function(s,g){ return s+(g.valor||0); }, 0);
+  const pgs = pagamentosEmp.filter(function(p){ return p.credor===credor; })
+    .sort(function(a,b){ return new Date(b.data)-new Date(a.data); });
+  const pago = pgs.reduce(function(s,p){ return s+(p.valor||0); }, 0);
+  return {gastos:gs, emprestado:emprestado, pagamentos:pgs, pago:pago, saldo:emprestado-pago};
+}
+
+function linhasOrigemEntradas(rec) {
+  let h = '';
+  if(rec.proprio>0) h += '<div class="card" style="margin-bottom:8px;padding:10px 14px"><div style="display:flex;justify-content:space-between"><span style="font-size:13px">💰 Meu dinheiro (gastos marcados)</span><span style="font-size:14px;font-weight:500;color:var(--green-mid)">'+fmtR(rec.proprio)+'</span></div></div>';
+  if(rec.emprestimo>0) h += '<div class="card" style="margin-bottom:8px;padding:10px 14px"><div style="display:flex;justify-content:space-between"><span style="font-size:13px">🤝 Empréstimos (gastos marcados)</span><span style="font-size:14px;font-weight:500;color:var(--green-mid)">'+fmtR(rec.emprestimo)+'</span></div></div>';
+  return h;
+}
+
+// ---- Origem de um gasto já cadastrado: grava SOMENTE os campos origem e emprestimoDe ----
+window.abrirOrigemGastoById = function(btn) {
+  abrirOrigemGasto(btn.getAttribute('data-gid'), btn.getAttribute('data-voltar')||'');
+};
+
+window.abrirOrigemGasto = function(id, voltar) {
+  const g = gastos.find(function(x){ return x.id===id; });
+  if(!g) { showToast('Gasto não encontrado.'); return; }
+  const overlay = document.getElementById('modal-overlay');
+  const mc = document.getElementById('modal-content');
+  const atual = origemGasto(g);
+  mc.innerHTML = '<div class="modal-handle"></div>'
+    +'<div class="modal-title">Origem do dinheiro</div>'
+    +'<div style="font-size:13px;color:var(--text-muted);margin-bottom:14px" id="og-resumo"></div>'
+    +'<div class="form-group">'
+      +'<label class="form-label">De onde saiu o dinheiro deste gasto?</label>'
+      +'<select class="form-input" id="og-origem">'
+        +'<option value="caixa"'+(atual==='caixa'?' selected':'')+'>🏦 Caixa</option>'
+        +'<option value="proprio"'+(atual==='proprio'?' selected':'')+'>💰 Meu dinheiro</option>'
+        +'<option value="emprestimo"'+(atual==='emprestimo'?' selected':'')+'>🤝 Empréstimo</option>'
+      +'</select>'
+    +'</div>'
+    +'<div id="og-emp-wrap" style="display:none"><div class="form-group">'
+      +'<label class="form-label">Empréstimo de quem?</label>'
+      +'<input class="form-input" id="og-emp" type="text" list="og-credores" placeholder="Ex: Vô Larissa">'
+      +'<datalist id="og-credores">'+opcoesCredoresHtml()+'</datalist>'
+    +'</div></div>'
+    +'<button class="btn-primary" id="btn-salvar-origem">Salvar</button>'
+    +'<button class="btn-secondary" id="btn-cancelar-origem">Cancelar</button>';
+  document.getElementById('og-resumo').textContent = (g.descricao||getCat(g.categoria).label)+' · '+fmtR(g.valor||0);
+  document.getElementById('og-emp').value = g.emprestimoDe||'';
+  const alternar = function() {
+    document.getElementById('og-emp-wrap').style.display = document.getElementById('og-origem').value==='emprestimo' ? 'block' : 'none';
+  };
+  document.getElementById('og-origem').onchange = alternar;
+  alternar();
+  overlay.classList.add('open');
+  const voltarTela = function() { if(voltar==='aportes') setTimeout(abrirResumoAportes, 300); };
+  document.getElementById('btn-cancelar-origem').onclick = function() { fecharModal(); voltarTela(); };
+  document.getElementById('btn-salvar-origem').onclick = async function() {
+    const origem = document.getElementById('og-origem').value;
+    let de = '';
+    if(origem==='emprestimo') {
+      de = document.getElementById('og-emp').value.trim();
+      if(!de) { showToast('Informe de quem foi o empréstimo'); return; }
+    }
+    try {
+      await updateDoc(doc(db,'gastos',id), { origem: origem, emprestimoDe: de });
+      showToast('Origem atualizada!');
+      fecharModal();
+      voltarTela();
+    } catch(e) { showToast('Erro ao salvar.'); console.error(e); }
+  };
+};
+
+// Campo "origem" dentro do formulário de gasto
+window.toggleOrigemEmp = function() {
+  const o = document.getElementById('f-origem');
+  const w = document.getElementById('campo-emp');
+  if(o && w) w.style.display = o.value==='emprestimo' ? 'block' : 'none';
+};
+
+// ---- Pagamentos do empréstimo (não são gastos: só abatem o saldo devedor) ----
+window.abrirModalPagamentoEmpById = function(btn) {
+  const credor = btn.getAttribute('data-credor');
+  const r = resumoEmprestimo(credor);
+  const overlay = document.getElementById('modal-overlay');
+  const mc = document.getElementById('modal-content');
+  mc.innerHTML = '<div class="modal-handle"></div>'
+    +'<div class="modal-title">Pagamento do empréstimo</div>'
+    +'<div style="font-size:13px;color:var(--text-muted);margin-bottom:14px">🤝 <span id="pe-credor"></span> · saldo devedor atual: <strong>'+fmtR(r.saldo)+'</strong></div>'
+    +'<div class="form-group"><label class="form-label">Valor pago (R$)</label><input class="form-input" id="pe-valor" type="text" inputmode="numeric" placeholder="0,00"></div>'
+    +'<div class="form-group"><label class="form-label">Data do pagamento</label><input class="form-input" id="pe-data" type="date" min="2000-01-01" max="2100-12-31" value="'+hojeLocal()+'"></div>'
+    +'<div class="form-group"><label class="form-label">Observação (opcional)</label><input class="form-input" id="pe-obs" type="text"></div>'
+    +'<button class="btn-primary" id="btn-salvar-pagemp">Registrar pagamento</button>'
+    +'<button class="btn-secondary" id="btn-cancelar-pagemp">Cancelar</button>';
+  document.getElementById('pe-credor').textContent = credor;
+  setupMoeda('pe-valor');
+  overlay.classList.add('open');
+  document.getElementById('btn-cancelar-pagemp').onclick = function() { fecharModal(); setTimeout(abrirResumoAportes, 300); };
+  document.getElementById('btn-salvar-pagemp').onclick = async function() {
+    const valor = getValorInput('pe-valor');
+    const data = document.getElementById('pe-data').value;
+    const obs = document.getElementById('pe-obs').value.trim();
+    if(!valor || valor<=0) { showToast('Informe o valor pago'); return; }
+    if(!dataIsoValida(data)) { showToast('Data inválida (use um ano entre 2000 e 2100)'); return; }
+    try {
+      await addDoc(collection(db,'pagamentosEmprestimo'), {
+        credor: credor, valor: valor, data: data, obs: obs,
+        quem: currentUser.displayName||currentUser.email.split('@')[0],
+        uid: currentUser.uid,
+        criadoEm: new Date().toISOString()
+      });
+      showToast('Pagamento registrado!');
+      fecharModal();
+      setTimeout(abrirResumoAportes, 300);
+    } catch(e) { showToast('Erro ao salvar.'); console.error(e); }
+  };
+};
+
+window.excluirPagamentoEmpById = function(btn) {
+  const id = btn.getAttribute('data-pid');
+  showConfirm({
+    titulo: 'Excluir pagamento',
+    mensagem: 'Excluir este pagamento? O saldo devedor do empréstimo volta a aumentar.',
+    confirmLabel: 'Excluir',
+    danger: true,
+    onConfirm: async function() {
+      try {
+        await deleteDoc(doc(db,'pagamentosEmprestimo',id));
+        showToast('Pagamento excluído!');
+        fecharModal();
+        setTimeout(abrirResumoAportes, 300);
+      } catch(e) { showToast('Erro ao excluir.'); console.error(e); }
+    }
+  });
+};
+
+function linhaGastoOrigem(g) {
+  const cat = getCat(g.categoria);
+  const data = g.data ? new Date(g.data+'T00:00:00').toLocaleDateString('pt-BR') : '—';
+  return '<div class="gasto-item">'
+    +'<div class="gasto-icon" style="background:'+cat.cor+'22">'+cat.icon+'</div>'
+    +'<div class="gasto-info">'
+      +'<div class="gi-cat">'+cat.label+'</div>'
+      +'<div class="gi-desc">'+(g.descricao||'—')+'</div>'
+      +'<div class="gi-data">'+data+(g.status==='pago' ? '' : ' · ⏳ ainda não pago (não entra no total)')+'</div>'
+      +'<div class="gasto-actions"><button class="btn-edit" data-gid="'+g.id+'" data-voltar="aportes" onclick="abrirOrigemGastoById(this)">Origem</button></div>'
+    +'</div>'
+    +'<div class="gasto-valor"><div class="gv-val green">'+fmtR(g.valor||0)+'</div></div>'
+  +'</div>';
+}
+
+// ---- Menu Recursos próprios (substitui a lista antiga de aportes) ----
+window.abrirResumoAportes = function() {
+  const overlay = document.getElementById('modal-overlay');
+  const mc = document.getElementById('modal-content');
+  const rec = calcRecursosProprios();
+  const proprios = gastos.filter(function(g){ return g.origem==='proprio'; })
+    .sort(function(a,b){ return new Date(b.data)-new Date(a.data); });
+  const credores = listaCredores();
+  const aportesOrd = [...aportes].sort(function(a,b){ return new Date(b.data)-new Date(a.data); });
+
+  const secProprio = proprios.length===0
+    ? '<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">Nenhum gasto marcado como meu dinheiro. Na aba Gastos, toque em "Origem" em um gasto para marcar.</div>'
+    : proprios.map(linhaGastoOrigem).join('');
+
+  const secEmp = credores.length===0
+    ? '<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">Nenhum empréstimo marcado. Na aba Gastos, toque em "Origem" e escolha Empréstimo.</div>'
+    : credores.map(function(c) {
+        const r = resumoEmprestimo(c);
+        const pagsHtml = r.pagamentos.length===0
+          ? '<div style="font-size:12px;color:var(--text-hint);margin-top:8px">Nenhum pagamento registrado ainda</div>'
+          : '<div style="margin-top:8px">'+r.pagamentos.map(function(p) {
+              return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-top:1px solid var(--border);font-size:12px">'
+                +'<div>'+fmtData(p.data)+(p.obs ? ' · '+p.obs : '')+'</div>'
+                +'<div style="display:flex;align-items:center;gap:8px"><strong style="color:var(--green-mid)">'+fmtR(p.valor||0)+'</strong>'
+                +'<button class="btn-del" data-pid="'+p.id+'" onclick="excluirPagamentoEmpById(this)" style="padding:3px 8px">🗑️</button></div>'
+              +'</div>';
+            }).join('')+'</div>';
+        return '<div class="card" style="margin-bottom:10px">'
+          +'<div style="font-size:14px;font-weight:500">🤝 '+c+'</div>'
+          +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px">'
+            +'<div style="background:var(--green-light);border-radius:6px;padding:8px;text-align:center"><div style="font-size:11px;color:var(--green-mid)">Emprestado</div><div style="font-size:13px;font-weight:700;color:var(--green-mid)">'+fmtR(r.emprestado)+'</div></div>'
+            +'<div style="background:var(--green-light);border-radius:6px;padding:8px;text-align:center"><div style="font-size:11px;color:var(--green-mid)">Já pago</div><div style="font-size:13px;font-weight:700;color:var(--green-mid)">'+fmtR(r.pago)+'</div></div>'
+            +'<div style="background:var(--red-light);border-radius:6px;padding:8px;text-align:center"><div style="font-size:11px;color:var(--red)">Saldo devedor</div><div style="font-size:13px;font-weight:700;color:var(--red)">'+fmtR(r.saldo)+'</div></div>'
+          +'</div>'
+          +pagsHtml
+          +'<button class="btn-primary" data-credor="'+c+'" onclick="abrirModalPagamentoEmpById(this)" style="margin-top:10px;margin-bottom:0">+ Registrar pagamento</button>'
+          +'<details style="margin-top:10px"><summary style="cursor:pointer;font-size:12px;color:var(--green-mid)">Gastos pagos com este empréstimo ('+r.gastos.length+')</summary><div style="margin-top:8px">'+r.gastos.map(linhaGastoOrigem).join('')+'</div></details>'
+        +'</div>';
+      }).join('');
+
+  const secAportes = aportesOrd.length===0 ? '' :
+    '<div class="section-title" style="margin-top:16px">💵 Aportes registrados manualmente</div>'
+    + aportesOrd.map(function(a) {
+        const data = a.data ? new Date(a.data+'T00:00:00').toLocaleDateString('pt-BR') : '—';
+        return '<div class="gasto-item">'
+          +'<div class="gasto-icon" style="background:#e8f2fb">💵</div>'
+          +'<div class="gasto-info">'
+            +'<div class="gi-cat">'+(a.descricao||'Aporte próprio')+'</div>'
+            +'<div class="gi-data">Data: '+data+' · '+(a.quem||'')+'</div>'
+            +'<div class="gasto-actions"><button class="btn-del" data-aid="'+a.id+'" onclick="confirmarExcluirAporte(this.getAttribute(\'data-aid\'))">🗑️ Excluir</button></div>'
+          +'</div>'
+          +'<div class="gasto-valor"><div class="gv-val green">'+fmtR(a.valor||0)+'</div></div>'
+        +'</div>';
+      }).join('');
+
+  mc.innerHTML = '<div class="modal-handle"></div>'
+    +'<div class="modal-title">Recursos próprios</div>'
+    +'<div class="card" style="margin-bottom:12px;padding:12px 16px">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center">'
+        +'<span style="font-size:13px;font-weight:500">Total investido</span>'
+        +'<span style="font-size:17px;font-weight:500;color:var(--green-mid)">'+fmtR(rec.total)+'</span>'
+      +'</div>'
+      +'<div style="font-size:11px;color:var(--text-muted);margin-top:6px">Meu dinheiro '+fmtR(rec.proprio)+' · Empréstimos '+fmtR(rec.emprestimo)+(rec.aportesManuais>0?' · Aportes '+fmtR(rec.aportesManuais):'')+'</div>'
+    +'</div>'
+    +'<div class="section-title">💰 Meu dinheiro</div>'
+    +secProprio
+    +'<div class="section-title" style="margin-top:16px">🤝 Empréstimos</div>'
+    +secEmp
+    +secAportes
+    +'<button class="btn-primary" onclick="fecharModal();setTimeout(abrirModalAporte,200)" style="margin-top:12px">+ Registrar aporte manual</button>'
+    +'<div class="modal-footer" style="gap:8px"><button onclick="gerarPDFAportes()" style="background:var(--green-light);color:var(--green);border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:500;cursor:pointer;font-family:\'DM Sans\',sans-serif">📄 PDF Recursos próprios</button><button class="btn-fechar" onclick="fecharModal()">✕ Fechar</button></div>';
+  overlay.classList.add('open');
+};
+
+window.gerarPDFAportes = function() {
+  const rec = calcRecursosProprios();
+  const lista = [...aportes].sort(function(a,b){ return new Date(a.data)-new Date(b.data); });
+  const proprios = gastos.filter(function(g){ return g.origem==='proprio'; }).sort(function(a,b){ return new Date(a.data)-new Date(b.data); });
+  const credores = listaCredores();
+  let body = '<div class="rg">'
+    +'<div class="rc green"><div class="rl">Total investido</div><div class="rv">'+r$(rec.total)+'</div></div>'
+    +'<div class="rc"><div class="rl">Meu dinheiro</div><div class="rv">'+r$(rec.proprio)+'</div></div>'
+    +'<div class="rc"><div class="rl">Empréstimos</div><div class="rv">'+r$(rec.emprestimo)+'</div></div>'
+    +'</div>';
+  if(proprios.length>0) {
+    body += '<h2>Gastos com meu dinheiro</h2><table><thead><tr><th>Data</th><th>Descrição</th><th>Situação</th><th>Valor</th></tr></thead><tbody>'
+      + proprios.map(function(g){ return '<tr><td>'+fmtData(g.data)+'</td><td>'+(g.descricao||'—')+'</td><td>'+(g.status==='pago'?'Pago':'Pendente')+'</td><td>'+r$(g.valor||0)+'</td></tr>'; }).join('')
+      + '</tbody></table>';
+  }
+  if(credores.length>0) {
+    body += '<h2>Empréstimos</h2><table><thead><tr><th>De quem</th><th>Emprestado</th><th>Já pago</th><th>Saldo devedor</th></tr></thead><tbody>'
+      + credores.map(function(c){ const r = resumoEmprestimo(c); return '<tr><td>'+c+'</td><td>'+r$(r.emprestado)+'</td><td>'+r$(r.pago)+'</td><td><strong>'+r$(r.saldo)+'</strong></td></tr>'; }).join('')
+      + '</tbody></table>';
+    const todosPag = pagamentosEmp.slice().sort(function(a,b){ return new Date(a.data)-new Date(b.data); });
+    if(todosPag.length>0) {
+      body += '<h2>Pagamentos de empréstimos</h2><table><thead><tr><th>Data</th><th>De quem</th><th>Obs.</th><th>Valor</th></tr></thead><tbody>'
+        + todosPag.map(function(p){ return '<tr><td>'+fmtData(p.data)+'</td><td>'+(p.credor||'—')+'</td><td>'+(p.obs||'—')+'</td><td>'+r$(p.valor||0)+'</td></tr>'; }).join('')
+        + '</tbody></table>';
+    }
+  }
+  if(lista.length>0) {
+    body += '<h2>Aportes registrados manualmente</h2><table><thead><tr><th>#</th><th>Data</th><th>Descrição</th><th>Por</th><th>Valor</th></tr></thead><tbody>'
+      + lista.map(function(a,i){ return '<tr><td>'+(i+1)+'</td><td>'+fmtData(a.data)+'</td><td>'+(a.descricao||'Aporte próprio')+'</td><td>'+(a.quem||'—')+'</td><td>'+r$(a.valor||0)+'</td></tr>'; }).join('')
+      + '</tbody></table>';
+  }
+  gerarPDF('Recursos Próprios', body);
+};
 
 // ===================== ACERTOS POR ETAPA (MÃO DE OBRA) =====================
 // Cada acerto = valor combinado com um profissional por uma etapa (coleção 'acertos').
@@ -2267,6 +2714,8 @@ window.abrirModalGasto = function(id) {
   if(profSelGasto && !listaProfGasto.includes(profSelGasto)) listaProfGasto.push(profSelGasto);
   let optsProfGasto = '';
   listaProfGasto.forEach(function(p) { optsProfGasto += '<option value="'+p+'"'+(p===profSelGasto?' selected':'')+'>'+p+'</option>'; });
+  const origemAtual = origemGasto(g);
+  const optsCredoresForm = opcoesCredoresHtml();
   content.innerHTML = `
     <div class="modal-handle"></div>
     <div class="modal-title">${g?'Editar gasto':'Novo gasto'}</div>
@@ -2336,12 +2785,29 @@ window.abrirModalGasto = function(id) {
       </div>
       <div id="parcela-info" class="parcelas-info"></div>
     </div>
+    <div class="form-group">
+      <label class="form-label">Origem do dinheiro</label>
+      <select class="form-input" id="f-origem" onchange="toggleOrigemEmp()">
+        <option value="caixa" ${origemAtual==='caixa'?'selected':''}>🏦 Caixa</option>
+        <option value="proprio" ${origemAtual==='proprio'?'selected':''}>💰 Meu dinheiro</option>
+        <option value="emprestimo" ${origemAtual==='emprestimo'?'selected':''}>🤝 Empréstimo</option>
+      </select>
+    </div>
+    <div id="campo-emp" style="display:none">
+      <div class="form-group">
+        <label class="form-label">Empréstimo de quem?</label>
+        <input class="form-input" id="f-emp-de" type="text" list="lista-credores" placeholder="Ex: Vô Larissa">
+        <datalist id="lista-credores">${optsCredoresForm}</datalist>
+      </div>
+    </div>
     <button class="btn-primary" id="btn-salvar-gasto">Salvar gasto</button>
     <button class="btn-secondary" onclick="fecharModal()">Cancelar</button>
   `;
   overlay.classList.add('open');
   toggleParcelas();
   toggleProfissional();
+  document.getElementById('f-emp-de').value = g ? (g.emprestimoDe||'') : '';
+  toggleOrigemEmp();
   if(g && g.categoria === 'mao_obra') setTimeout(()=>{ const s = document.getElementById('f-profissional'); if(s && g.profissional) s.value = g.profissional; atualizarOpcoesAcerto(g.acertoId); },50);
   if(pre) {
     const fc = document.getElementById('f-cat'); if(fc) fc.value = 'mao_obra';
@@ -2447,6 +2913,22 @@ window.fecharModal = function(e) {
 };
 
 // ===================== CRUD =====================
+// Ao editar um gasto parcelado: mantém as parcelas (e as já pagas) se o parcelamento não mudou.
+// Se mudou e já existe parcela paga, bloqueia para não perder o controle de pagamento.
+function resolverParcelasEdicao(orig, pgto, totalParcelas, valor, primeiraVenc, parcelasNovas) {
+  const antigas = (orig && Array.isArray(orig.parcelas)) ? orig.parcelas : [];
+  if(antigas.length===0) return {parcelas:parcelasNovas, erro:''};
+  const mesmo = pgto==='cartao_parcelado'
+    && totalParcelas===(orig.totalParcelas||antigas.length)
+    && Math.abs(valor-(orig.valor||0))<0.005
+    && primeiraVenc===antigas[0].vencimento;
+  if(mesmo) return {parcelas:antigas, erro:''};
+  if(antigas.some(function(p){ return p.status==='pago'; })) {
+    return {parcelas:parcelasNovas, erro:'Há parcelas já pagas: não dá para mudar valor, parcelas, 1ª data ou forma de pagamento.'};
+  }
+  return {parcelas:parcelasNovas, erro:''};
+}
+
 async function salvarGasto() {
   const btn = document.getElementById('btn-salvar-gasto');
   btn.innerHTML = '<span class="spinner"></span>';
@@ -2478,6 +2960,11 @@ async function salvarGasto() {
     }
   }
 
+  const origEd = editandoGasto ? gastos.find(x=>x.id===editandoGasto) : null;
+  const resEd = resolverParcelasEdicao(origEd, pgto, totalParcelas, valor, document.getElementById('f-data-parcela')?.value || data, parcelas);
+  if(resEd.erro) { showToast(resEd.erro); btn.innerHTML='Salvar gasto';btn.disabled=false; return; }
+  parcelas = resEd.parcelas;
+
   let profissional = '';
   let acertoId = '';
   if(cat === 'mao_obra') {
@@ -2489,15 +2976,25 @@ async function salvarGasto() {
     } else { profissional = profSel||''; }
   }
 
+  const origem = document.getElementById('f-origem')?.value || 'caixa';
+  let emprestimoDe = '';
+  if(origem === 'emprestimo') {
+    emprestimoDe = (document.getElementById('f-emp-de')?.value || '').trim();
+    if(!emprestimoDe) { showToast('Informe de quem foi o empréstimo'); btn.innerHTML='Salvar gasto';btn.disabled=false; return; }
+  }
+
   const payload = {
     valor, categoria:cat, descricao:desc, data, status,
     formaPagamento:pgto, totalParcelas, parcelas,
-    profissional, acertoId,
+    profissional, acertoId, origem, emprestimoDe,
     quem: currentUser.displayName||currentUser.email.split('@')[0],
     uid: currentUser.uid,
     criadoEm: new Date().toISOString(),
     atualizadoEm: new Date().toISOString()
   };
+
+  // Na edição, quem lançou e a data de criação originais não são trocados
+  if(editandoGasto) { delete payload.quem; delete payload.uid; delete payload.criadoEm; }
 
   try {
     if(editandoGasto) {
@@ -2602,6 +3099,11 @@ function subscribeData() {
   if(unsubAcertos) unsubAcertos();
   unsubAcertos = onSnapshot(collection(db,'acertos'), snap=>{
     acertos = snap.docs.map(d=>({id:d.id,...d.data()}));
+    render();
+  });
+  if(unsubPagEmp) unsubPagEmp();
+  unsubPagEmp = onSnapshot(collection(db,'pagamentosEmprestimo'), snap=>{
+    pagamentosEmp = snap.docs.map(d=>({id:d.id,...d.data()}));
     render();
   });
   // Load infoObra
@@ -2721,6 +3223,7 @@ window.exportarBackup = async function() {
       serventes,
       maodeobra,
       acertos,
+      pagamentosEmprestimo: pagamentosEmp,
       aportes,
       tarefas
     };
@@ -2792,6 +3295,12 @@ window.importarBackup = async function(event) {
         const {id, ...dados} = ac;
         if(!id) continue;
         await setDoc(doc(db,'acertos',id), {...dados, restauradoEm: new Date().toISOString()});
+        importados++;
+      }
+      for(const pe of (backup.pagamentosEmprestimo||[])) {
+        const {id, ...dados} = pe;
+        if(!id) continue;
+        await setDoc(doc(db,'pagamentosEmprestimo',id), {...dados, restauradoEm: new Date().toISOString()});
         importados++;
       }
       showToast(`Backup restaurado! ${importados} registros importados.`);
@@ -2996,14 +3505,6 @@ window.gerarPDFCaixa = function() {
   gerarPDF('Caixa Econômica', body);
 };
 
-window.gerarPDFAportes = function() {
-  const lista=[...aportes].sort((a,b)=>new Date(a.data)-new Date(b.data));
-  const total=lista.reduce((s,a)=>s+(a.valor||0),0);
-  const rows=lista.map((a,i)=>`<tr><td>${i+1}</td><td>${fmtData(a.data)}</td><td>${a.descricao||'Aporte próprio'}</td><td>${a.quem||'—'}</td><td style="color:#2d6b55;font-weight:700">${r$(a.valor||0)}</td></tr>`).join('');
-  const body=`<div class="rg"><div class="rc"><div class="rl">Total de aportes</div><div class="rv">${lista.length}</div></div><div class="rc green"><div class="rl">Total investido</div><div class="rv">${r$(total)}</div></div></div><h2>Detalhes dos aportes</h2>${lista.length===0?'<p style="color:#999;padding:12px 0">Nenhum aporte registrado ainda.</p>':`<table><thead><tr><th>#</th><th>Data</th><th>Descrição</th><th>Registrado por</th><th>Valor</th></tr></thead><tbody>${rows}<tr class="tr"><td colspan="4">TOTAL</td><td>${r$(total)}</td></tr></tbody></table>`}`;
-  gerarPDF('Recursos Próprios', body);
-};
-
 window.gerarPDFPago = function() {
   const lista=[...gastos].filter(g=>g.status==='pago').sort((a,b)=>new Date(a.data)-new Date(b.data));
   const total=lista.reduce((s,g)=>s+(g.valor||0),0);
@@ -3104,8 +3605,8 @@ window.abrirProgressoObra = function() {
     return `<div class="card" style="margin-bottom:8px;cursor:pointer" onclick="abrirTarefasEtapa(${num})">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
         <div style="font-size:13px;font-weight:500">Etapa ${num}</div>
-        <div style="display:flex;align-items:center;gap:6px">
-          ${liberada?'<span style="font-size:10px;background:var(--green-light);color:var(--green-mid);padding:2px 7px;border-radius:10px;font-weight:500">Liberada</span>':''}
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end">
+          ${etapaBadgesProgresso(prog, !!liberada)}
           <span style="font-size:12px;font-weight:600;color:var(--green-mid)">${prog.pct}%</span>
           <span style="font-size:11px;color:var(--text-hint)">›</span>
         </div>
@@ -3159,13 +3660,13 @@ window.abrirTarefasEtapa = function(num) {
       <div class="gasto-info" style="flex:1">
         <div class="gi-cat" style="${t.concluida?'text-decoration:line-through;color:var(--text-muted)':''}">${t.nome||''}</div>
         ${t.obs?('<div class="gi-desc">'+t.obs+'</div>'):''}
-        <div class="gi-data">${inicioFmt?'Início: '+inicioFmt:''}${fimFmt?' · Conclusão: '+fimFmt:''}</div>
+        <div class="gi-data">${tarefaDatasHtml(t)}</div>
         <div class="gasto-actions">
           <button class="btn-edit" onclick="editarTarefa('${t.id}',${num})">✏️ Editar</button>
           <button class="btn-del" onclick="deletarTarefa('${t.id}')">🗑️ Excluir</button>
         </div>
       </div>
-      <div style="font-size:11px;color:${t.concluida?'var(--green-mid)':'var(--text-hint)'};flex-shrink:0;text-align:right">${t.concluida?'✅ Feito':'Pendente'}</div>
+      <div style="font-size:11px;color:${tarefaCorStatus(t)};flex-shrink:0;text-align:right">${tarefaStatusTxt(t)}</div>
     </div>`;
   }).join('');
 
@@ -3192,11 +3693,11 @@ window.abrirTarefasEtapa = function(num) {
       </div>
       <div class="form-group">
         <label class="form-label">Data de início</label>
-        <input class="form-input" id="nova-tarefa-inicio-${num}" type="date" value="${new Date().toISOString().slice(0,10)}">
+        <input class="form-input" id="nova-tarefa-inicio-${num}" type="date" min="2000-01-01" max="2100-12-31" value="${hojeLocal()}" onchange="ajustarMinPrevisao(${num})">
       </div>
       <div class="form-group">
         <label class="form-label">Data prevista de conclusão (opcional)</label>
-        <input class="form-input" id="nova-tarefa-previsao-${num}" type="date">
+        <input class="form-input" id="nova-tarefa-previsao-${num}" type="date" min="${hojeLocal()}" max="2100-12-31">
       </div>
       <div class="form-group">
         <label class="form-label">Observação (opcional)</label>
@@ -3220,6 +3721,9 @@ window.adicionarTarefa = async function(etapaNum) {
   const inicio = inicioEl?.value;
   if(!nome) { showToast('Digite o nome da tarefa'); return; }
   if(!inicio) { showToast('Informe a data de início'); return; }
+  const previsaoVal = document.getElementById('nova-tarefa-previsao-'+etapaNum)?.value || '';
+  const erroDatas = validarDatasTarefa(inicio, previsaoVal, '');
+  if(erroDatas) { showToast(erroDatas); return; }
   try {
     const previsaoEl = document.getElementById('nova-tarefa-previsao-'+etapaNum);
     await addDoc(collection(db,'tarefas'), {
@@ -3242,13 +3746,14 @@ window.toggleTarefa = function(id, concluida, etapaNum) {
     // Ask for completion date
     const overlay = document.getElementById('modal-overlay');
     const mc = document.getElementById('modal-content');
-    const hoje = new Date().toISOString().slice(0,10);
+    const hoje = hojeLocal();
+    const tIni = (tarefas.find(x=>x.id===id)||{}).dataInicio || '2000-01-01';
     mc.innerHTML = `
       <div class="modal-handle"></div>
       <div class="modal-title">Data de conclusão</div>
       <div class="form-group" style="margin-bottom:0">
         <label class="form-label">Quando esta tarefa foi concluída?</label>
-        <input class="form-input" id="data-conclusao" type="date" value="${hoje}">
+        <input class="form-input" id="data-conclusao" type="date" min="${tIni}" max="2100-12-31" value="${hoje}">
       </div>
       <button class="btn-primary" id="btn-confirmar-conclusao" style="margin-top:16px">✅ Confirmar conclusão</button>
       <button class="btn-secondary" onclick="fecharModal();setTimeout(()=>abrirTarefasEtapa(${etapaNum}),200)">Cancelar</button>
@@ -3257,6 +3762,9 @@ window.toggleTarefa = function(id, concluida, etapaNum) {
     document.getElementById('btn-confirmar-conclusao').onclick = async () => {
       const data = document.getElementById('data-conclusao').value;
       if(!data) { showToast('Selecione a data de conclusão'); return; }
+      const tObj = tarefas.find(x=>x.id===id);
+      const erroDt = validarDatasTarefa(tObj && tObj.dataInicio ? tObj.dataInicio : data, '', data);
+      if(erroDt) { showToast(erroDt); return; }
       try {
         await updateDoc(doc(db,'tarefas',id), {
           concluida: true,
@@ -3282,51 +3790,6 @@ window.toggleTarefa = function(id, concluida, etapaNum) {
       }
     });
   }
-};
-
-window.editarTarefa = function(id, etapaNum) {
-  const t = tarefas.find(x=>x.id===id);
-  if(!t) { showToast('Tarefa não encontrada.'); return; }
-  const overlay = document.getElementById('modal-overlay');
-  const mc = document.getElementById('modal-content');
-  mc.innerHTML = ''
-    +'<div class="modal-handle"></div>'
-    +'<div class="modal-title">Editar tarefa</div>'
-    +'<div class="form-group">'
-      +'<label class="form-label">Nome da tarefa</label>'
-      +'<input class="form-input" id="edit-tarefa-nome" type="text">'
-    +'</div>'
-    +'<div class="form-group">'
-      +'<label class="form-label">Data de início</label>'
-      +'<input class="form-input" id="edit-tarefa-inicio" type="date" value="'+(t.dataInicio||'')+'">'
-    +'</div>'
-    +'<div class="form-group">'
-      +'<label class="form-label">Data prevista de conclusão (opcional)</label>'
-      +'<input class="form-input" id="edit-tarefa-previsao" type="date" value="'+(t.dataPrevista||'')+'">'
-    +'</div>'
-    +'<div class="form-group">'
-      +'<label class="form-label">Observação (opcional)</label>'
-      +'<input class="form-input" id="edit-tarefa-obs" type="text">'
-    +'</div>'
-    +'<button class="btn-primary" id="btn-salvar-edicao-tarefa">Salvar alterações</button>'
-    +'<button class="btn-secondary" onclick="fecharModal();setTimeout(()=>abrirTarefasEtapa('+etapaNum+'),200)">Cancelar</button>';
-  document.getElementById('edit-tarefa-nome').value = t.nome||'';
-  document.getElementById('edit-tarefa-obs').value = t.obs||'';
-  overlay.classList.add('open');
-  document.getElementById('btn-salvar-edicao-tarefa').onclick = async () => {
-    const nome = document.getElementById('edit-tarefa-nome').value.trim();
-    const inicio = document.getElementById('edit-tarefa-inicio').value;
-    if(!nome) { showToast('Digite o nome da tarefa'); return; }
-    if(!inicio) { showToast('Informe a data de início'); return; }
-    const previsao = document.getElementById('edit-tarefa-previsao').value;
-    const obs = document.getElementById('edit-tarefa-obs').value.trim();
-    try {
-      await updateDoc(doc(db,'tarefas',id), { nome, dataInicio: inicio, dataPrevista: previsao, obs });
-      showToast('Tarefa atualizada!');
-      fecharModal();
-      setTimeout(()=>abrirTarefasEtapa(etapaNum), 200);
-    } catch(e) { showToast('Erro ao atualizar.'); console.error(e); }
-  };
 };
 
 window.deletarTarefa = function(id) {
@@ -3935,6 +4398,7 @@ window.fazerLogout = async function() {
   if(unsubTarefas) unsubTarefas();
   if(unsubMaodeobra) unsubMaodeobra();
   if(unsubAcertos) unsubAcertos();
+  if(unsubPagEmp) unsubPagEmp();
   await signOut(auth);
 };
 
